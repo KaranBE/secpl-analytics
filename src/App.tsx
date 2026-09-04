@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { User } from 'firebase/auth';
 import { 
   CompressorRecord, 
   DispenserSheetRecord, 
@@ -16,9 +17,23 @@ import {
   computeZoneMetrics, 
   computeEngineerMetrics 
 } from './data/mockData';
+import { 
+  initAuth, 
+  googleSignIn, 
+  googleSignOut, 
+  getAccessToken 
+} from './services/firebaseAuth';
+import { 
+  fetchLiveCompressorRecords, 
+  fetchLiveDispenserRecords,
+  COMPRESSOR_SPREADSHEET_ID,
+  DISPENSER_SPREADSHEET_ID
+} from './services/googleSheets';
+import { normalizeDateToISO } from './utils/dateUtils';
 import { Header } from './components/Header';
 import { Sidebar, DashboardNavTab } from './components/Sidebar';
 import { FilterBar } from './components/FilterBar';
+import { GoogleSheetsSyncBar } from './components/GoogleSheetsSyncBar';
 import { OverviewDashboard } from './components/Dashboard/OverviewDashboard';
 import { ZoneAnalytics } from './components/Dashboard/ZoneAnalytics';
 import { EngineerAnalytics } from './components/Dashboard/EngineerAnalytics';
@@ -30,12 +45,19 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Primary Dual-Sheet Datasets
-  const [compressorData] = useState<CompressorRecord[]>(COMPRESSOR_RECORDS);
-  const [dispenserData] = useState<DispenserSheetRecord[]>(DISPENSER_RECORDS);
+  // Google Sheets Authentication & Sync State
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(false);
+  const [isSyncingSheets, setIsSyncingSheets] = useState<boolean>(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [compressorSheetTitle, setCompressorSheetTitle] = useState<string>('');
+  const [dispenserSheetTitle, setDispenserSheetTitle] = useState<string>('');
 
-  // Live Clock
-  const [currentTimeStr, setCurrentTimeStr] = useState<string>('17:48 IST');
+  // Primary Dual-Sheet Datasets (populated with default baseline, replaced with live sheets data on sync)
+  const [compressorData, setCompressorData] = useState<CompressorRecord[]>(COMPRESSOR_RECORDS);
+  const [dispenserData, setDispenserData] = useState<DispenserSheetRecord[]>(DISPENSER_RECORDS);
 
   // Filter States
   const [filters, setFilters] = useState<DashboardFilters>({
@@ -50,15 +72,124 @@ export default function App() {
     searchQuery: ''
   });
 
-  useEffect(() => {
-    const updateTime = () => {
-      const d = new Date();
-      setCurrentTimeStr(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' IST');
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
+  // Sync function to load records from Google Sheets
+  const syncLiveSheets = useCallback(async (token: string) => {
+    setIsSyncingSheets(true);
+    setSyncError(null);
+    try {
+      const [compRes, dispRes] = await Promise.allSettled([
+        fetchLiveCompressorRecords(COMPRESSOR_SPREADSHEET_ID, token),
+        fetchLiveDispenserRecords(DISPENSER_SPREADSHEET_ID, token)
+      ]);
+
+      let compLoaded = false;
+      let dispLoaded = false;
+      const errors: string[] = [];
+
+      if (compRes.status === 'fulfilled') {
+        if (compRes.value.records.length > 0) {
+          setCompressorData(compRes.value.records);
+          compLoaded = true;
+        }
+        setCompressorSheetTitle(compRes.value.sheetTitle);
+      } else {
+        errors.push(`Compressor Sheet: ${compRes.reason?.message || 'Access error'}`);
+      }
+
+      if (dispRes.status === 'fulfilled') {
+        if (dispRes.value.records.length > 0) {
+          setDispenserData(dispRes.value.records);
+          dispLoaded = true;
+        }
+        setDispenserSheetTitle(dispRes.value.sheetTitle);
+      } else {
+        errors.push(`Dispenser Sheet: ${dispRes.reason?.message || 'Access error'}`);
+      }
+
+      if (errors.length > 0 && !compLoaded && !dispLoaded) {
+        setSyncError(errors.join(' | '));
+      } else {
+        const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastSyncedAt(timeNow);
+      }
+    } catch (err: any) {
+      console.error('Error syncing Google Sheets:', err);
+      setSyncError(err?.message || 'Failed to sync Google Sheets');
+    } finally {
+      setIsSyncingSheets(false);
+    }
   }, []);
+
+  // Listen for Firebase Auth state changes
+  useEffect(() => {
+    const unsubscribe = initAuth(
+      async (authUser, token) => {
+        setUser(authUser);
+        setIsAuthenticated(true);
+        if (token) {
+          await syncLiveSheets(token);
+        }
+      },
+      () => {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    );
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [syncLiveSheets]);
+
+  // Handle Google Sign In
+  const handleSignIn = async () => {
+    setIsLoadingAuth(true);
+    setSyncError(null);
+    try {
+      const res = await googleSignIn();
+      if (res) {
+        setUser(res.user);
+        setIsAuthenticated(true);
+        await syncLiveSheets(res.accessToken);
+      }
+    } catch (err: any) {
+      if (
+        err?.code === 'auth/popup-closed-by-user' || 
+        err?.code === 'auth/cancelled-popup-request'
+      ) {
+        // User voluntarily dismissed popup, no error needed
+        return;
+      }
+      if (err?.code === 'auth/popup-blocked') {
+        setSyncError('Sign-in popup was blocked by your browser. Please allow popups or open this app in a new tab.');
+        return;
+      }
+      console.error('Google sign in error:', err);
+      setSyncError(err?.message || 'Google sign-in could not be completed.');
+    } finally {
+      setIsLoadingAuth(false);
+    }
+  };
+
+  // Handle Google Sign Out
+  const handleSignOut = async () => {
+    await googleSignOut();
+    setUser(null);
+    setIsAuthenticated(false);
+    setLastSyncedAt(null);
+    setSyncError(null);
+    setCompressorData(COMPRESSOR_RECORDS);
+    setDispenserData(DISPENSER_RECORDS);
+  };
+
+  // Manual Trigger for Refreshing Sheets
+  const handleManualSync = async () => {
+    const token = getAccessToken();
+    if (!token) {
+      handleSignIn();
+      return;
+    }
+    await syncLiveSheets(token);
+  };
 
   // Available unique Zones & Engineers for filter dropdowns
   const availableZones = useMemo(() => {
@@ -83,14 +214,33 @@ export default function App() {
   // Helper date filter evaluator
   const matchesDate = (dateStr: string) => {
     if (filters.datePreset === 'all') return true;
-    if (filters.datePreset === 'today') return dateStr === '2026-09-04';
-    if (filters.datePreset === 'this_week') return dateStr >= '2026-08-31' && dateStr <= '2026-09-04';
-    if (filters.datePreset === 'this_month') return dateStr.startsWith('2026-09');
-    if (filters.datePreset === 'this_quarter') return dateStr >= '2026-07-01' && dateStr <= '2026-09-30';
-    if (filters.datePreset === 'this_year') return dateStr.startsWith('2026');
+    const iso = normalizeDateToISO(dateStr);
+    const now = new Date();
+    const todayIso = now.toISOString().slice(0, 10);
+    const thisMonthIso = todayIso.slice(0, 7);
+    const thisYearIso = todayIso.slice(0, 4);
+
+    if (filters.datePreset === 'today') {
+      return iso === todayIso || iso === '2026-09-04';
+    }
+    if (filters.datePreset === 'this_week') {
+      const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 10);
+      return (iso >= weekAgo && iso <= todayIso) || (iso >= '2026-08-31' && iso <= '2026-09-04');
+    }
+    if (filters.datePreset === 'this_month') {
+      return iso.startsWith(thisMonthIso) || iso.startsWith('2026-09');
+    }
+    if (filters.datePreset === 'this_quarter') {
+      const qMonth = Math.floor(now.getMonth() / 3) * 3;
+      const qStart = new Date(now.getFullYear(), qMonth, 1).toISOString().slice(0, 10);
+      return (iso >= qStart && iso <= todayIso) || (iso >= '2026-07-01' && iso <= '2026-09-30');
+    }
+    if (filters.datePreset === 'this_year') {
+      return iso.startsWith(thisYearIso) || iso.startsWith('2026');
+    }
     if (filters.datePreset === 'custom') {
-      if (filters.startDate && dateStr < filters.startDate) return false;
-      if (filters.endDate && dateStr > filters.endDate) return false;
+      if (filters.startDate && iso < filters.startDate) return false;
+      if (filters.endDate && iso > filters.endDate) return false;
       return true;
     }
     return true;
@@ -108,12 +258,14 @@ export default function App() {
       }
 
       // 3. Multi-Select Zone filter
-      if (filters.zones.length > 0 && !filters.zones.includes(inc.zoneOrArea)) {
+      const isAllZones = filters.zones.length === 0 || (availableZones.length > 0 && filters.zones.length >= availableZones.length);
+      if (!isAllZones && !filters.zones.includes(inc.zoneOrArea)) {
         return false;
       }
 
       // 4. Multi-Select Engineer filter
-      if (filters.engineers.length > 0 && !filters.engineers.includes(inc.engineer)) {
+      const isAllEngineers = filters.engineers.length === 0 || (availableEngineers.length > 0 && filters.engineers.length >= availableEngineers.length);
+      if (!isAllEngineers && !filters.engineers.includes(inc.engineer)) {
         return false;
       }
 
@@ -143,11 +295,14 @@ export default function App() {
 
   // Filtered Compressor records (used specifically for Customer Analysis)
   const filteredCompressorRecords = useMemo(() => {
+    const isAllZones = filters.zones.length === 0 || (availableZones.length > 0 && filters.zones.length >= availableZones.length);
+    const isAllEngineers = filters.engineers.length === 0 || (availableEngineers.length > 0 && filters.engineers.length >= availableEngineers.length);
+
     return compressorData.filter(c => {
       if (!matchesDate(c.date)) return false;
       if (filters.equipmentType === 'Dispenser') return false;
-      if (filters.zones.length > 0 && !filters.zones.includes(c.area)) return false;
-      if (filters.engineers.length > 0 && !filters.engineers.includes(c.supportEngineer)) return false;
+      if (!isAllZones && !filters.zones.includes(c.area)) return false;
+      if (!isAllEngineers && !filters.engineers.includes(c.supportEngineer)) return false;
       if (filters.status !== 'All' && c.status !== filters.status) return false;
       
       const activeSearch = (searchQuery || filters.searchQuery).trim().toLowerCase();
@@ -168,11 +323,14 @@ export default function App() {
 
   // Filtered Dispenser records
   const filteredDispenserRecords = useMemo(() => {
+    const isAllZones = filters.zones.length === 0 || (availableZones.length > 0 && filters.zones.length >= availableZones.length);
+    const isAllEngineers = filters.engineers.length === 0 || (availableEngineers.length > 0 && filters.engineers.length >= availableEngineers.length);
+
     return dispenserData.filter(d => {
       if (!matchesDate(d.date)) return false;
       if (filters.equipmentType === 'Compressor') return false;
-      if (filters.zones.length > 0 && !filters.zones.includes(d.zoneName)) return false;
-      if (filters.engineers.length > 0 && !filters.engineers.includes(d.serviceEngineerName)) return false;
+      if (!isAllZones && !filters.zones.includes(d.zoneName)) return false;
+      if (!isAllEngineers && !filters.engineers.includes(d.serviceEngineerName)) return false;
       if (filters.status !== 'All' && d.status !== filters.status) return false;
 
       const activeSearch = (searchQuery || filters.searchQuery).trim().toLowerCase();
@@ -226,11 +384,27 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-indigo-500 selection:text-white">
       {/* Top Header */}
       <Header
-        currentTimeStr={currentTimeStr}
         isMobileMenuOpen={isMobileMenuOpen}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        user={user}
+        isLiveSynced={isAuthenticated && !!lastSyncedAt}
+      />
+
+      {/* Google Sheets Live Sync Bar */}
+      <GoogleSheetsSyncBar
+        user={user}
+        isAuthenticated={isAuthenticated}
+        isLoading={isLoadingAuth}
+        isSyncing={isSyncingSheets}
+        syncError={syncError}
+        lastSyncedAt={lastSyncedAt}
+        compressorRowCount={compressorData.length}
+        dispenserRowCount={dispenserData.length}
+        compressorSheetTitle={compressorSheetTitle}
+        dispenserSheetTitle={dispenserSheetTitle}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
+        onSync={handleManualSync}
       />
 
       {/* Main Container with Sidebar Layout */}
@@ -244,6 +418,8 @@ export default function App() {
             totalComplaintsCount={allUnifiedIncidents.length}
             compressorCount={compressorData.length}
             dispenserCount={dispenserData.length}
+            engineerCount={engineerMetrics.length}
+            isLiveConnected={isAuthenticated && !!lastSyncedAt}
           />
         </div>
 
@@ -262,7 +438,9 @@ export default function App() {
                 totalComplaintsCount={allUnifiedIncidents.length}
                 compressorCount={compressorData.length}
                 dispenserCount={dispenserData.length}
+                engineerCount={engineerMetrics.length}
                 onCloseMobile={() => setIsMobileMenuOpen(false)}
+                isLiveConnected={isAuthenticated && !!lastSyncedAt}
               />
             </div>
           </div>

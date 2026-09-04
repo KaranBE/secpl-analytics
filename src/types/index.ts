@@ -1,12 +1,11 @@
 export type TicketStatus = 'Open' | 'In Progress' | 'Closed';
-export type TicketPriority = 'Low' | 'Medium' | 'High' | 'Critical';
 export type EquipmentType = 'All' | 'Compressor' | 'Dispenser';
 export type ViewMode = 'both' | 'graphical' | 'tabular';
 
 export type DatePreset = 'all' | 'today' | 'this_week' | 'this_month' | 'this_quarter' | 'this_year' | 'custom';
 
 // Sheet 1: Compressor Data Columns
-// Date, Customer Name, Area, Model, Serial Number, Problem, Call Priority, Contract, Support Engineer, WhatsApp Message ID, Sender Number
+// Date, Customer Name, Area, Model, Serial Number, Problem, Contract, Support Engineer, WhatsApp Message ID, Sender Number
 export interface CompressorRecord {
   id: string;
   date: string; // YYYY-MM-DD
@@ -15,7 +14,6 @@ export interface CompressorRecord {
   model: string;
   serialNumber: string;
   problem: string;
-  callPriority: TicketPriority;
   contract: 'Comprehensive AMC' | 'Non-Comprehensive AMC' | 'Warranty' | 'Standard SLA' | 'On-Demand';
   supportEngineer: string;
   whatsappMessageId: string;
@@ -55,7 +53,6 @@ export interface UnifiedIncidentRecord {
   zoneOrArea: string;
   assetIdentifier: string; // Model/Serial No
   problem: string;
-  priority: TicketPriority;
   engineer: string;
   status: TicketStatus;
   whatsappMessageId: string;
@@ -90,7 +87,6 @@ export interface CustomerMetric {
   topProblems: { problem: string; count: number }[];
   primaryEngineer: string;
   avgResolutionHours: number;
-  criticalCount: number;
 }
 
 export interface EngineerMetric {
@@ -134,7 +130,6 @@ export interface ComplaintRecord {
   issueCategory: string;
   dispenserId: string;
   assignedEngineer: string;
-  priority: TicketPriority;
   status: TicketStatus;
   resolutionTimeHours?: number;
   closedAt?: string;

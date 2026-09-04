@@ -57,7 +57,6 @@ export const LiveTicketsView: React.FC<LiveTicketsViewProps> = ({
                 <th className="py-2.5 px-3">Customer & Location</th>
                 <th className="py-2.5 px-3">Zone</th>
                 <th className="py-2.5 px-3">Issue Category</th>
-                <th className="py-2.5 px-3">Priority</th>
                 <th className="py-2.5 px-3">Technician</th>
                 <th className="py-2.5 px-3">MTTR</th>
                 <th className="py-2.5 px-3">Status</th>
@@ -84,17 +83,6 @@ export const LiveTicketsView: React.FC<LiveTicketsViewProps> = ({
                   </td>
                   <td className="py-3 px-3 font-medium text-slate-800">
                     {ticket.issueCategory}
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      ticket.priority === 'Critical'
-                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                        : ticket.priority === 'High'
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                        : 'bg-slate-100 text-slate-700 border border-slate-200'
-                    }`}>
-                      {ticket.priority}
-                    </span>
                   </td>
                   <td className="py-3 px-3 font-medium text-slate-700">
                     {ticket.assignedEngineer}

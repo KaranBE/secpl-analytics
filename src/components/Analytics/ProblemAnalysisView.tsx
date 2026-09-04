@@ -52,7 +52,6 @@ export const ProblemAnalysisView: React.FC = () => {
             <div className="p-3.5 rounded-xl bg-sky-50/70 border border-sky-200/80">
               <div className="flex justify-between items-center font-bold text-sky-800 mb-1">
                 <span>1. Water Leakage (30.8% • 384 incidents)</span>
-                <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[10px]">High Priority</span>
               </div>
               <p className="text-slate-700 leading-relaxed">
                 Primary causes: 3-way connector silicone fatigue & high main pressure. Mandate steel braided hose retrofits on all next preventive visits.
@@ -62,7 +61,6 @@ export const ProblemAnalysisView: React.FC = () => {
             <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80">
               <div className="flex justify-between items-center font-bold text-emerald-800 mb-1">
                 <span>2. Filter Choked (23.9% • 298 incidents)</span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px]">Scheduled</span>
               </div>
               <p className="text-slate-700 leading-relaxed">
                 Driven by high sediment in East and North municipal lines. Auto-trigger 45-day preventive flush alerts in Private Dispenser sheet.
@@ -72,7 +70,6 @@ export const ProblemAnalysisView: React.FC = () => {
             <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-200/80">
               <div className="flex justify-between items-center font-bold text-rose-800 mb-1">
                 <span>3. Power Tripping (11.4% • 142 incidents)</span>
-                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px]">Safety Critical</span>
               </div>
               <p className="text-slate-700 leading-relaxed">
                 Voltage fluctuations in non-SEZ buildings. SMPS surge protectors deployed across all commercial 4-tap units.

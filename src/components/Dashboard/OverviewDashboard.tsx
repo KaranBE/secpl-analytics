@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   UnifiedIncidentRecord, 
   CompressorRecord, 
@@ -8,6 +8,7 @@ import {
   CustomerMetric, 
   ViewMode 
 } from '../../types';
+import { buildTimelineData } from '../../utils/dateUtils';
 import { 
   CheckCircle2, 
   AlertCircle, 
@@ -70,6 +71,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 }) => {
   const [tableSearch, setTableSearch] = useState('');
   const [selectedIncident, setSelectedIncident] = useState<UnifiedIncidentRecord | null>(null);
+  const [timelineChartType, setTimelineChartType] = useState<'area' | 'bar'>('area');
+  const [isTimelineStacked, setIsTimelineStacked] = useState<boolean>(true);
 
   // Overall Statistics
   const totalIncidents = incidents.length;
@@ -80,23 +83,15 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   const compressorCount = incidents.filter(i => i.equipmentType === 'Compressor').length;
   const dispenserCount = incidents.filter(i => i.equipmentType === 'Dispenser').length;
 
-  const criticalCount = incidents.filter(i => i.priority === 'Critical').length;
-  const highCount = incidents.filter(i => i.priority === 'High').length;
-
-  // Aggregate daily timeline data
-  const dateCounts: Record<string, { date: string; compressor: number; dispenser: number; total: number }> = {};
-  incidents.forEach(inc => {
-    if (!dateCounts[inc.date]) {
-      dateCounts[inc.date] = { date: inc.date.slice(5), compressor: 0, dispenser: 0, total: 0 };
-    }
-    if (inc.equipmentType === 'Compressor') {
-      dateCounts[inc.date].compressor += 1;
-    } else {
-      dateCounts[inc.date].dispenser += 1;
-    }
-    dateCounts[inc.date].total += 1;
-  });
-  const timelineData = Object.values(dateCounts).sort((a, b) => a.date.localeCompare(b.date));
+  // Aggregate timeline data with robust date normalization and chronological ordering
+  const { 
+    timeline: timelineData, 
+    peakDay, 
+    avgDaily, 
+    totalCompressor, 
+    totalDispenser, 
+    totalInflow 
+  } = useMemo(() => buildTimelineData(incidents), [incidents]);
 
   // Equipment distribution
   const equipmentPieData = [
@@ -131,9 +126,9 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   const showTabular = viewMode === 'both' || viewMode === 'tabular';
 
   const exportCSV = () => {
-    const headers = ['ID,Date,Equipment,Customer or Station,Zone,Asset / Model,Problem,Priority,Assigned Engineer,Status,Contract / Service Type,WhatsApp Sender'];
+    const headers = ['ID,Date,Equipment,Customer or Station,Zone,Asset / Model,Problem,Assigned Engineer,Status,Contract / Service Type,WhatsApp Sender'];
     const rows = filteredTableIncidents.map(i => 
-      `"${i.id}","${i.date}","${i.equipmentType}","${i.entityName}","${i.zoneOrArea}","${i.assetIdentifier}","${i.problem}","${i.priority}","${i.engineer}","${i.status}","${i.contractOrServiceType}","${i.senderNumber}"`
+      `"${i.id}","${i.date}","${i.equipmentType}","${i.entityName}","${i.zoneOrArea}","${i.assetIdentifier}","${i.problem}","${i.engineer}","${i.status}","${i.contractOrServiceType}","${i.senderNumber}"`
     );
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -217,42 +212,281 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Chart 1: Timeline Trend Curve */}
           <div className="lg:col-span-2 bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-indigo-600" />
-                  Dual-Sheet Incident Inflow Timeline
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-indigo-600" />
+                    Dual-Sheet Incident Inflow Timeline
+                  </h3>
+                  <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100">
+                    {totalInflow} Tickets
+                  </span>
+                </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Daily incoming tickets across Compressors (Sheet 1) and Dispensers (Sheet 2)
+                  Chronological ticket inflow across Compressor (Sheet 1) & Dispenser (Sheet 2)
                 </p>
+              </div>
+
+              {/* Badges & Chart Mode Toggles */}
+              <div className="flex flex-wrap items-center gap-2">
+                {peakDay && (
+                  <div className="hidden sm:flex items-center gap-1 text-[11px] font-medium bg-amber-50/80 text-amber-800 px-2.5 py-1 rounded-lg border border-amber-200/60" title={`Peak inflow date: ${peakDay.date}`}>
+                    <Flame className="w-3 h-3 text-amber-500" />
+                    <span>Peak: <strong className="font-semibold">{peakDay.count}</strong> ({peakDay.label})</span>
+                  </div>
+                )}
+                {avgDaily > 0 && (
+                  <div className="hidden md:flex items-center gap-1 text-[11px] font-medium bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200/70">
+                    <Clock className="w-3 h-3 text-slate-500" />
+                    <span>Avg: <strong className="font-semibold">{avgDaily}</strong>/day</span>
+                  </div>
+                )}
+
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/80 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setTimelineChartType('area')}
+                    className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                      timelineChartType === 'area'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                    title="Area spline chart"
+                  >
+                    Area
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTimelineChartType('bar')}
+                    className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                      timelineChartType === 'bar'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                    title="Grouped bar chart"
+                  >
+                    Bars
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsTimelineStacked(!isTimelineStacked)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all ${
+                    isTimelineStacked
+                      ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                  title="Toggle stacked view"
+                >
+                  {isTimelineStacked ? 'Stacked' : 'Side-by-Side'}
+                </button>
               </div>
             </div>
 
             <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={timelineData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorComp" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorDisp" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                  />
-                  <Legend verticalAlign="top" height={36} iconType="circle" />
-                  <Area type="monotone" dataKey="compressor" name="Compressor Sheet" stroke="#4f46e5" fillOpacity={1} fill="url(#colorComp)" />
-                  <Area type="monotone" dataKey="dispenser" name="Dispenser Sheet" stroke="#10b981" fillOpacity={1} fill="url(#colorDisp)" />
-                </AreaChart>
-              </ResponsiveContainer>
+              {timelineData.length === 0 ? (
+                <div className="h-full w-full flex flex-col items-center justify-center text-slate-400 text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50/50 p-6 text-center">
+                  <TrendingUp className="w-8 h-8 text-slate-300 mb-2" />
+                  <p className="font-semibold text-slate-700 text-sm">No ticket inflow logged for selected period</p>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                    No tickets match the active date, equipment, or zone filters. Adjust the filters above to view timeline trends.
+                  </p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  {timelineChartType === 'area' ? (
+                    <AreaChart data={timelineData} margin={{ top: 12, right: 15, left: -5, bottom: 5 }}>
+                      <defs>
+                        <linearGradient id="colorComp" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.35}/>
+                          <stop offset="95%" stopColor="#4f46e5" stopOpacity={0.02}/>
+                        </linearGradient>
+                        <linearGradient id="colorDisp" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.35}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.02}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="displayDate" 
+                        tick={{ fontSize: 11, fill: '#64748b' }} 
+                        minTickGap={16}
+                        tickLine={false}
+                        axisLine={{ stroke: '#e2e8f0' }}
+                      />
+                      <YAxis 
+                        allowDecimals={false} 
+                        domain={[0, 'auto']} 
+                        tick={{ fontSize: 11, fill: '#64748b' }} 
+                        width={35}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0]?.payload;
+                            if (!data) return null;
+                            const comp = data.compressor || 0;
+                            const disp = data.dispenser || 0;
+                            const tot = data.total || (comp + disp);
+                            const compPct = tot > 0 ? Math.round((comp / tot) * 100) : 0;
+                            const dispPct = tot > 0 ? Math.round((disp / tot) * 100) : 0;
+
+                            return (
+                              <div className="bg-white/95 backdrop-blur-md px-3.5 py-3 rounded-xl shadow-lg border border-slate-200 text-xs min-w-[210px]">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                                  <span className="font-semibold text-slate-800">{data.fullDate}</span>
+                                  <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded font-mono text-[11px]">
+                                    {tot} {tot === 1 ? 'ticket' : 'tickets'}
+                                  </span>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-slate-600">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 inline-block"></span>
+                                      <span>Compressors (Sheet 1):</span>
+                                    </div>
+                                    <div className="font-semibold text-slate-900 font-mono">
+                                      {comp} <span className="text-[10px] text-slate-400 font-normal">({compPct}%)</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-slate-600">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+                                      <span>Dispensers (Sheet 2):</span>
+                                    </div>
+                                    <div className="font-semibold text-slate-900 font-mono">
+                                      {disp} <span className="text-[10px] text-slate-400 font-normal">({dispPct}%)</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend 
+                        verticalAlign="top" 
+                        height={32} 
+                        iconType="circle"
+                        wrapperStyle={{ fontSize: '11px', paddingTop: '0px' }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="compressor" 
+                        name="Compressor Sheet" 
+                        stroke="#4f46e5" 
+                        strokeWidth={2}
+                        stackId={isTimelineStacked ? "1" : undefined}
+                        fillOpacity={1} 
+                        fill="url(#colorComp)" 
+                        dot={{ r: 3, fill: '#4f46e5', stroke: '#ffffff', strokeWidth: 1.5 }}
+                        activeDot={{ r: 5, fill: '#4f46e5' }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="dispenser" 
+                        name="Dispenser Sheet" 
+                        stroke="#10b981" 
+                        strokeWidth={2}
+                        stackId={isTimelineStacked ? "1" : undefined}
+                        fillOpacity={1} 
+                        fill="url(#colorDisp)" 
+                        dot={{ r: 3, fill: '#10b981', stroke: '#ffffff', strokeWidth: 1.5 }}
+                        activeDot={{ r: 5, fill: '#10b981' }}
+                      />
+                    </AreaChart>
+                  ) : (
+                    <BarChart data={timelineData} margin={{ top: 12, right: 15, left: -5, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="displayDate" 
+                        tick={{ fontSize: 11, fill: '#64748b' }} 
+                        minTickGap={16}
+                        tickLine={false}
+                        axisLine={{ stroke: '#e2e8f0' }}
+                      />
+                      <YAxis 
+                        allowDecimals={false} 
+                        domain={[0, 'auto']} 
+                        tick={{ fontSize: 11, fill: '#64748b' }} 
+                        width={35}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0]?.payload;
+                            if (!data) return null;
+                            const comp = data.compressor || 0;
+                            const disp = data.dispenser || 0;
+                            const tot = data.total || (comp + disp);
+                            const compPct = tot > 0 ? Math.round((comp / tot) * 100) : 0;
+                            const dispPct = tot > 0 ? Math.round((disp / tot) * 100) : 0;
+
+                            return (
+                              <div className="bg-white/95 backdrop-blur-md px-3.5 py-3 rounded-xl shadow-lg border border-slate-200 text-xs min-w-[210px]">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                                  <span className="font-semibold text-slate-800">{data.fullDate}</span>
+                                  <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded font-mono text-[11px]">
+                                    {tot} {tot === 1 ? 'ticket' : 'tickets'}
+                                  </span>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-slate-600">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 inline-block"></span>
+                                      <span>Compressors (Sheet 1):</span>
+                                    </div>
+                                    <div className="font-semibold text-slate-900 font-mono">
+                                      {comp} <span className="text-[10px] text-slate-400 font-normal">({compPct}%)</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-slate-600">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+                                      <span>Dispensers (Sheet 2):</span>
+                                    </div>
+                                    <div className="font-semibold text-slate-900 font-mono">
+                                      {disp} <span className="text-[10px] text-slate-400 font-normal">({dispPct}%)</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend 
+                        verticalAlign="top" 
+                        height={32} 
+                        iconType="circle"
+                        wrapperStyle={{ fontSize: '11px', paddingTop: '0px' }}
+                      />
+                      <Bar 
+                        dataKey="compressor" 
+                        name="Compressor Sheet" 
+                        fill="#4f46e5" 
+                        stackId={isTimelineStacked ? "1" : undefined}
+                        radius={isTimelineStacked ? [0, 0, 0, 0] : [4, 4, 0, 0]}
+                      />
+                      <Bar 
+                        dataKey="dispenser" 
+                        name="Dispenser Sheet" 
+                        fill="#10b981" 
+                        stackId={isTimelineStacked ? "1" : undefined}
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  )}
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
 
@@ -351,7 +585,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </p>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-emerald-600 font-semibold">
-            <span>Explore 5 Technicians</span>
+            <span>Explore {engineerMetrics.length} Technicians</span>
             <span>&rarr;</span>
           </div>
         </div>

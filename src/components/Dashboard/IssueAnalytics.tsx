@@ -100,7 +100,6 @@ export const IssueAnalytics: React.FC = () => {
           <div className="p-4 rounded-xl bg-sky-50/70 border border-sky-200/80">
             <div className="flex justify-between items-center font-bold text-sky-900 mb-1.5">
               <span>Water Leakage (30.8%)</span>
-              <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[10px]">High Priority</span>
             </div>
             <p className="text-slate-700 leading-relaxed">
               Main cause: 3-way connector silicone fatigue & high main pressure. Mandated steel braided hose retrofits on all upcoming preventative visits.
@@ -110,7 +109,6 @@ export const IssueAnalytics: React.FC = () => {
           <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200/80">
             <div className="flex justify-between items-center font-bold text-emerald-900 mb-1.5">
               <span>Filter Choking (23.9%)</span>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px]">Medium Priority</span>
             </div>
             <p className="text-slate-700 leading-relaxed">
               Main cause: Municipal sediment spikes in East and North zones. Standardized dual sediment pre-filters on high-intake dispensers.
@@ -120,7 +118,6 @@ export const IssueAnalytics: React.FC = () => {
           <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200/80">
             <div className="flex justify-between items-center font-bold text-indigo-900 mb-1.5">
               <span>Cooling Faults (19.7%)</span>
-              <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px]">High Priority</span>
             </div>
             <p className="text-slate-700 leading-relaxed">
               Main cause: Dust accumulation on condenser coils and thermostat relay wear. Cleaned coils during standard 30-day service cycle.

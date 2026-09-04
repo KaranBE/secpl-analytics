@@ -20,7 +20,9 @@ interface SidebarProps {
   totalComplaintsCount: number;
   compressorCount: number;
   dispenserCount: number;
+  engineerCount?: number;
   onCloseMobile?: () => void;
+  isLiveConnected?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -30,7 +32,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   totalComplaintsCount,
   compressorCount,
   dispenserCount,
-  onCloseMobile
+  engineerCount,
+  onCloseMobile,
+  isLiveConnected
 }) => {
   const navItems: {
     id: DashboardNavTab;
@@ -61,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Engineer Analysis',
       description: 'Workforce efficiency, MTTR & CSAT',
       icon: Users,
-      badge: '5 Leads',
+      badge: `${engineerCount ?? 7} Techs`,
       badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-100'
     },
     {
@@ -154,10 +158,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-4 border-t border-slate-100">
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="font-semibold text-slate-700">Live Sync Ready</span>
+            <div className={`w-2 h-2 rounded-full ${isLiveConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`}></div>
+            <span className="font-semibold text-slate-700">
+              {isLiveConnected ? 'Sheets Live Synced' : 'Ready to Connect'}
+            </span>
           </div>
-          <span className="text-[11px] text-slate-400 font-mono">v3.1 Dual-Sheet</span>
+          <span className="text-[11px] text-slate-400 font-mono">v3.2 Google Sheets</span>
         </div>
       </div>
     </aside>

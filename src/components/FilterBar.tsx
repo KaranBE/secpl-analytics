@@ -136,6 +136,19 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     });
   };
 
+  const isAllZonesSelected = availableZones.length > 0 && filters.zones.length === availableZones.length;
+  const isAllEngineersSelected = availableEngineers.length > 0 && filters.engineers.length === availableEngineers.length;
+
+  const zoneDisplayText = 
+    filters.zones.length === 0 || isAllZonesSelected
+      ? 'All'
+      : filters.zones.join(', ');
+
+  const engineerDisplayText = 
+    filters.engineers.length === 0 || isAllEngineersSelected
+      ? 'All'
+      : filters.engineers.join(', ');
+
   const isFiltered = 
     filters.datePreset !== 'all' || 
     filters.zones.length > 0 || 
@@ -306,7 +319,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             </span>
             {filters.zones.length > 0 && (
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
-                {filters.zones.length} selected
+                {isAllZonesSelected ? 'All' : `${filters.zones.length} selected`}
               </span>
             )}
           </label>
@@ -316,12 +329,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             onClick={() => setIsZoneOpen(!isZoneOpen)}
             className="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all text-left cursor-pointer"
           >
-            <span className="truncate">
-              {filters.zones.length === 0
-                ? 'All Zones (Default)'
-                : filters.zones.length === 1
-                ? filters.zones[0]
-                : `${filters.zones.length} Zones Selected`}
+            <span className="truncate" title={zoneDisplayText}>
+              {zoneDisplayText}
             </span>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
           </button>
@@ -390,7 +399,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             </span>
             {filters.engineers.length > 0 && (
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
-                {filters.engineers.length} selected
+                {isAllEngineersSelected ? 'All' : `${filters.engineers.length} selected`}
               </span>
             )}
           </label>
@@ -400,12 +409,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             onClick={() => setIsEngineerOpen(!isEngineerOpen)}
             className="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all text-left cursor-pointer"
           >
-            <span className="truncate">
-              {filters.engineers.length === 0
-                ? 'All Engineers (Default)'
-                : filters.engineers.length === 1
-                ? filters.engineers[0]
-                : `${filters.engineers.length} Engineers Selected`}
+            <span className="truncate" title={engineerDisplayText}>
+              {engineerDisplayText}
             </span>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
           </button>
@@ -515,22 +520,40 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               </button>
             </span>
           )}
-          {filters.zones.map((z) => (
-            <span key={z} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-medium">
-              Zone: {z}
-              <button onClick={() => handleToggleZone(z)} className="hover:text-slate-900 cursor-pointer">
+          {isAllZonesSelected ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-medium">
+              Zone: All
+              <button onClick={() => onFilterChange({ ...filters, zones: [] })} className="hover:text-slate-900 cursor-pointer" title="Clear Zone filter">
                 <X className="w-3 h-3" />
               </button>
             </span>
-          ))}
-          {filters.engineers.map((e) => (
-            <span key={e} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-medium">
-              Eng: {e}
-              <button onClick={() => handleToggleEngineer(e)} className="hover:text-slate-900 cursor-pointer">
+          ) : (
+            filters.zones.map((z) => (
+              <span key={z} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-medium">
+                Zone: {z}
+                <button onClick={() => handleToggleZone(z)} className="hover:text-slate-900 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))
+          )}
+          {isAllEngineersSelected ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-medium">
+              Eng: All
+              <button onClick={() => onFilterChange({ ...filters, engineers: [] })} className="hover:text-slate-900 cursor-pointer" title="Clear Engineer filter">
                 <X className="w-3 h-3" />
               </button>
             </span>
-          ))}
+          ) : (
+            filters.engineers.map((e) => (
+              <span key={e} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-medium">
+                Eng: {e}
+                <button onClick={() => handleToggleEngineer(e)} className="hover:text-slate-900 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))
+          )}
           {filters.status !== 'All' && (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-medium">
               Status: {filters.status}

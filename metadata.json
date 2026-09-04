@@ -1,6 +1,6 @@
 {
   "name": "Service Operations Analytics Dashboard",
-  "description": "Executive service operations analytics dashboard suite with multi-chart visual intelligence, regional zone performance metrics, technician efficiency tracking, and root cause analysis.",
+  "description": "Executive service operations analytics dashboard suite synchronized live with Google Sheets (Compressor & Dispenser spreadsheets), featuring visual intelligence, zone performance metrics, and technician tracking.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

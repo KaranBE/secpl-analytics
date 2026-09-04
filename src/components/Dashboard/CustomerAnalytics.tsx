@@ -70,7 +70,7 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
   }).sort((a, b) => {
     if (sortBy === 'total') return b.totalCalls - a.totalCalls;
     if (sortBy === 'open') return b.openCalls - a.openCalls;
-    if (sortBy === 'critical') return b.criticalCount - a.criticalCount;
+    if (sortBy === 'closed') return b.closedCalls - a.closedCalls;
     return a.customerName.localeCompare(b.customerName);
   });
 
@@ -106,15 +106,14 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
 
   const totalCompressorCalls = compressors.length;
   const totalOpenCompressorCalls = compressors.filter(c => c.status !== 'Closed').length;
-  const criticalCalls = compressors.filter(c => c.callPriority === 'Critical').length;
 
   const showGraphical = viewMode === 'both' || viewMode === 'graphical';
   const showTabular = viewMode === 'both' || viewMode === 'tabular';
 
   const exportCSV = () => {
-    const headers = ['Customer Name,Area,Contract,Total Calls,Open Calls,Closed Calls,Critical Calls,Active Models,Serial Numbers,Primary Engineer'];
+    const headers = ['Customer Name,Area,Contract,Total Calls,Open Calls,Closed Calls,Active Models,Serial Numbers,Primary Engineer'];
     const rows = filteredMetrics.map(c => 
-      `"${c.customerName}","${c.area}","${c.contract}",${c.totalCalls},${c.openCalls},${c.closedCalls},${c.criticalCount},"${c.activeModels.join('; ')}","${c.serialNumbers.join('; ')}","${c.primaryEngineer}"`
+      `"${c.customerName}","${c.area}","${c.contract}",${c.totalCalls},${c.openCalls},${c.closedCalls},"${c.activeModels.join('; ')}","${c.serialNumbers.join('; ')}","${c.primaryEngineer}"`
     );
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -161,9 +160,11 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
             <div className="text-[11px] text-amber-200">Active in Field</div>
           </div>
           <div>
-            <div className="text-xs text-indigo-200 font-medium">Critical Callouts</div>
-            <div className="text-2xl font-bold text-rose-300 mt-0.5">{criticalCalls}</div>
-            <div className="text-[11px] text-rose-200">High-Priority Assets</div>
+            <div className="text-xs text-indigo-200 font-medium">Resolution Rate</div>
+            <div className="text-2xl font-bold text-emerald-300 mt-0.5">
+              {totalCompressorCalls > 0 ? Math.round(((totalCompressorCalls - totalOpenCompressorCalls) / totalCompressorCalls) * 100) : 100}%
+            </div>
+            <div className="text-[11px] text-emerald-200">Closure Efficiency</div>
           </div>
         </div>
       </div>
@@ -345,7 +346,7 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
               >
                 <option value="total">Sort: Total Calls (High to Low)</option>
                 <option value="open">Sort: Open Calls</option>
-                <option value="critical">Sort: Critical Calls</option>
+                <option value="closed">Sort: Closed Calls</option>
                 <option value="name">Sort: Customer Name (A-Z)</option>
               </select>
             </div>
@@ -362,7 +363,6 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
                   <th className="py-3 px-3">Active Models & Serials</th>
                   <th className="py-3 px-3 text-center">Total Calls</th>
                   <th className="py-3 px-3 text-center">Open</th>
-                  <th className="py-3 px-3 text-center">Critical</th>
                   <th className="py-3 px-3">Top Problems Reported</th>
                   <th className="py-3 px-3">Assigned Lead</th>
                   <th className="py-3 px-3 text-right">Actions</th>
@@ -411,15 +411,6 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
                       {cust.openCalls > 0 ? (
                         <span className="font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
                           {cust.openCalls}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 font-medium">0</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      {cust.criticalCount > 0 ? (
-                        <span className="font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
-                          {cust.criticalCount}
                         </span>
                       ) : (
                         <span className="text-slate-400 font-medium">0</span>

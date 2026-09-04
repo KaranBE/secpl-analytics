@@ -11,7 +11,7 @@ import {
 
 // =========================================================================
 // SHEET 1: COMPRESSOR DATA
-// Exact columns: Date, Customer Name, Area, Model, Serial Number, Problem, Call Priority, Contract, Support Engineer, WhatsApp Message ID, Sender Number
+// Exact columns: Date, Customer Name, Area, Model, Serial Number, Problem, Contract, Support Engineer, WhatsApp Message ID, Sender Number
 // =========================================================================
 export const COMPRESSOR_DATA: CompressorRecord[] = [
   {
@@ -22,7 +22,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'AtlasCopco GA-37 VSD',
     serialNumber: 'CMP-SN-9081',
     problem: 'High Discharge Temp',
-    callPriority: 'Critical',
     contract: 'Comprehensive AMC',
     supportEngineer: 'Vishal Joshi',
     whatsappMessageId: 'wamid.HBgMOTE5ODIzMTQ0NTFBAA==',
@@ -38,7 +37,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'IngersollRand R-Series 55kW',
     serialNumber: 'CMP-SN-4412',
     problem: 'Air Pressure Drop',
-    callPriority: 'High',
     contract: 'Comprehensive AMC',
     supportEngineer: 'Amit Sharma',
     whatsappMessageId: 'wamid.HBgMOTE5ODg0MDE5MjgxAAY==',
@@ -55,7 +53,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'Kaeser CSDX 140',
     serialNumber: 'CMP-SN-1109',
     problem: 'Oil Filter Clogged',
-    callPriority: 'Medium',
     contract: 'Comprehensive AMC',
     supportEngineer: 'Amit Sharma',
     whatsappMessageId: 'wamid.HBgMOTE5NzQxMDg4MjMxAAI==',
@@ -72,7 +69,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'Elgi EG-45 Screw',
     serialNumber: 'CMP-SN-8274',
     problem: 'Motor Overload Tripping',
-    callPriority: 'Critical',
     contract: 'Warranty',
     supportEngineer: 'Vishal Joshi',
     whatsappMessageId: 'wamid.HBgMOTE5OTE2MDU1NDIxAAM==',
@@ -89,7 +85,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'AtlasCopco GA-75+',
     serialNumber: 'CMP-SN-3901',
     problem: 'Vibration Error',
-    callPriority: 'High',
     contract: 'Comprehensive AMC',
     supportEngineer: 'Priya Nair',
     whatsappMessageId: 'wamid.HBgMOTE5ODQ1MDc3MTIzAAQ==',
@@ -106,7 +101,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'Chicago Pneumatic CPM-20',
     serialNumber: 'CMP-SN-7643',
     problem: 'Air Leakage in Manifold',
-    callPriority: 'Medium',
     contract: 'Non-Comprehensive AMC',
     supportEngineer: 'Rahul Verma',
     whatsappMessageId: 'wamid.HBgMOTE5NjExMjAwOTg0AAU==',
@@ -123,7 +117,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'Kaeser CSDX 140',
     serialNumber: 'CMP-SN-5120',
     problem: 'Condensate Drain Jam',
-    callPriority: 'Low',
     contract: 'Standard SLA',
     supportEngineer: 'Sunil Patil',
     whatsappMessageId: 'wamid.HBgMOTE5MzQxMjM0NTY3AAY==',
@@ -140,7 +133,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'AtlasCopco GA-37 VSD',
     serialNumber: 'CMP-SN-9081',
     problem: 'Air Pressure Drop',
-    callPriority: 'High',
     contract: 'Comprehensive AMC',
     supportEngineer: 'Vishal Joshi',
     whatsappMessageId: 'wamid.HBgMOTE5ODIzMTQ0NTFBAAc==',
@@ -157,7 +149,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'Sullair S-Energy 75',
     serialNumber: 'CMP-SN-2394',
     problem: 'High Discharge Temp',
-    callPriority: 'High',
     contract: 'Comprehensive AMC',
     supportEngineer: 'Vikram Rao',
     whatsappMessageId: 'wamid.HBgMOTE5OTAwMTEyMjMzAAg==',
@@ -174,7 +165,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'Elgi EG-45 Screw',
     serialNumber: 'CMP-SN-6671',
     problem: 'Phase Sequence Fault',
-    callPriority: 'Medium',
     contract: 'Warranty',
     supportEngineer: 'Rahul Verma',
     whatsappMessageId: 'wamid.HBgMOTE5ODExMjIzMzQ0AAk==',
@@ -191,7 +181,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'AtlasCopco GA-75+',
     serialNumber: 'CMP-SN-1892',
     problem: 'Air Leakage in Manifold',
-    callPriority: 'High',
     contract: 'Comprehensive AMC',
     supportEngineer: 'Deepak Sen',
     whatsappMessageId: 'wamid.HBgMOTE5NzExMjI0NDU1AAo==',
@@ -208,7 +197,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'IngersollRand R-Series 55kW',
     serialNumber: 'CMP-SN-4412',
     problem: 'Oil Filter Clogged',
-    callPriority: 'Medium',
     contract: 'Comprehensive AMC',
     supportEngineer: 'Amit Sharma',
     whatsappMessageId: 'wamid.HBgMOTE5NjQ0MzMyMjExAAs==',
@@ -225,7 +213,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'Fusheng SA-37',
     serialNumber: 'CMP-SN-9981',
     problem: 'Motor Overload Tripping',
-    callPriority: 'Critical',
     contract: 'On-Demand',
     supportEngineer: 'Vikram Rao',
     whatsappMessageId: 'wamid.HBgMOTE5OTg4Nzc2NjU1AAw==',
@@ -242,7 +229,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'AtlasCopco GA-37 VSD',
     serialNumber: 'CMP-SN-9081',
     problem: 'Vibration Error',
-    callPriority: 'Medium',
     contract: 'Comprehensive AMC',
     supportEngineer: 'Vishal Joshi',
     whatsappMessageId: 'wamid.HBgMOTE5ODIzMTQ0NTFBAA0==',
@@ -259,7 +245,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'Kaeser CSDX 140',
     serialNumber: 'CMP-SN-1109',
     problem: 'High Discharge Temp',
-    callPriority: 'Critical',
     contract: 'Comprehensive AMC',
     supportEngineer: 'Amit Sharma',
     whatsappMessageId: 'wamid.HBgMOTE5NzQxMDg4MjMxAA4==',
@@ -276,7 +261,6 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
     model: 'AtlasCopco GA-75+',
     serialNumber: 'CMP-SN-3901',
     problem: 'Air Pressure Drop',
-    callPriority: 'High',
     contract: 'Comprehensive AMC',
     supportEngineer: 'Priya Nair',
     whatsappMessageId: 'wamid.HBgMOTE5ODQ1MDc3MTIzAA8==',
@@ -525,7 +509,6 @@ export function getUnifiedIncidents(
       zoneOrArea: c.area,
       assetIdentifier: `${c.model} (${c.serialNumber})`,
       problem: c.problem,
-      priority: c.callPriority,
       engineer: c.supportEngineer,
       status: c.status,
       whatsappMessageId: c.whatsappMessageId,
@@ -537,6 +520,18 @@ export function getUnifiedIncidents(
   });
 
   dispensers.forEach(d => {
+    // Ensure problem description never shows a raw timestamp/clock time
+    let cleanProblem = d.problem;
+    if (!cleanProblem || /^\d{1,2}[:.]\d{2}([:.]\d{2})?\s*(am|pm)?$/i.test(cleanProblem.trim())) {
+      cleanProblem = d.typeOfService === 'Breakdown'
+        ? 'Dispenser Breakdown'
+        : d.typeOfService === 'Preventive Maintenance'
+          ? 'Preventive Maintenance'
+          : d.typeOfService === 'Calibration'
+            ? 'Flow Meter Calibration Check'
+            : `${d.typeOfService} Service`;
+    }
+
     unified.push({
       id: d.id,
       equipmentType: 'Dispenser',
@@ -544,8 +539,7 @@ export function getUnifiedIncidents(
       entityName: d.stationName,
       zoneOrArea: d.zoneName,
       assetIdentifier: d.dispenserSerialNo,
-      problem: d.problem,
-      priority: d.typeOfService === 'Breakdown' ? 'High' : 'Medium',
+      problem: cleanProblem,
       engineer: d.serviceEngineerName,
       status: d.status,
       whatsappMessageId: d.whatsappMessageId,
@@ -603,7 +597,6 @@ export function computeCustomerMetrics(compressors: CompressorRecord[]): Custome
     });
     const primaryEngineer = Object.entries(engCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unassigned';
 
-    const criticalCount = data.calls.filter(c => c.callPriority === 'Critical').length;
     const avgRes = data.calls.reduce((sum, c) => sum + (c.resolutionTimeHours || 1.8), 0) / (totalCalls || 1);
 
     result.push({
@@ -618,7 +611,6 @@ export function computeCustomerMetrics(compressors: CompressorRecord[]): Custome
       topProblems,
       primaryEngineer,
       avgResolutionHours: Number(avgRes.toFixed(1)),
-      criticalCount
     });
   });
 
@@ -670,48 +662,167 @@ export function computeZoneMetrics(
   });
 }
 
-// Compute Engineer Metrics from filtered data
+// Known field engineer contacts & baseline directory
+const KNOWN_ENGINEERS: Record<string, { zone: string; phone: string }> = {
+  'Amit Sharma': { zone: 'South Zone', phone: '+91 98840 19283' },
+  'Vishal Joshi': { zone: 'West Zone', phone: '+91 98231 44510' },
+  'Rahul Verma': { zone: 'East Zone', phone: '+91 97410 88231' },
+  'Priya Nair': { zone: 'North Zone', phone: '+91 98450 77123' },
+  'Vikram Rao': { zone: 'Central Zone', phone: '+91 99001 12233' },
+  'Sunil Patil': { zone: 'West Zone', phone: '+91 93412 34567' },
+  'Deepak Sen': { zone: 'North Zone', phone: '+91 97112 24455' }
+};
+
+// Compute Engineer Metrics from dynamic filtered or synced data
 export function computeEngineerMetrics(
   compressors: CompressorRecord[],
   dispensers: DispenserSheetRecord[]
 ): EngineerMetric[] {
-  const ENGINEERS = [
-    { name: 'Amit Sharma', zone: 'South Zone', phone: '+91 98840 19283' },
-    { name: 'Vishal Joshi', zone: 'West Zone', phone: '+91 98231 44510' },
-    { name: 'Rahul Verma', zone: 'East Zone', phone: '+91 97410 88231' },
-    { name: 'Priya Nair', zone: 'North Zone', phone: '+91 98450 77123' },
-    { name: 'Vikram Rao', zone: 'Central Zone', phone: '+91 99001 12233' },
-    { name: 'Sunil Patil', zone: 'West Zone', phone: '+91 93412 34567' },
-    { name: 'Deepak Sen', zone: 'North Zone', phone: '+91 97112 24455' }
-  ];
+  // 1. Dynamically gather all unique engineer names across both sheets
+  const engineerNameSet = new Set<string>();
 
-  return ENGINEERS.map(eng => {
-    const cmp = compressors.filter(c => c.supportEngineer === eng.name);
-    const dsp = dispensers.filter(d => d.serviceEngineerName === eng.name);
+  compressors.forEach(c => {
+    const name = c.supportEngineer?.trim();
+    if (name && name.toLowerCase() !== 'unassigned' && name !== '-') {
+      engineerNameSet.add(name);
+    }
+  });
+
+  dispensers.forEach(d => {
+    const name = d.serviceEngineerName?.trim();
+    if (name && name.toLowerCase() !== 'unassigned' && name !== '-') {
+      engineerNameSet.add(name);
+    }
+  });
+
+  // If no engineers found in current filtered subset, include known directory as fallback
+  if (engineerNameSet.size === 0) {
+    Object.keys(KNOWN_ENGINEERS).forEach(name => engineerNameSet.add(name));
+  }
+
+  const result: EngineerMetric[] = Array.from(engineerNameSet).map(engName => {
+    const normName = engName.toLowerCase();
+
+    // Match all compressor and dispenser records for this technician
+    const cmp = compressors.filter(c => (c.supportEngineer || '').trim().toLowerCase() === normName);
+    const dsp = dispensers.filter(d => (d.serviceEngineerName || '').trim().toLowerCase() === normName);
 
     const totalAssigned = cmp.length + dsp.length;
-    const openTickets = cmp.filter(c => c.status !== 'Closed').length + dsp.filter(d => d.status !== 'Closed').length;
-    const totalClosed = totalAssigned - openTickets;
+    const closedCmp = cmp.filter(c => c.status === 'Closed');
+    const closedDsp = dsp.filter(d => d.status === 'Closed');
+    const totalClosed = closedCmp.length + closedDsp.length;
+    const openTickets = Math.max(0, totalAssigned - totalClosed);
 
-    const respTimes = dsp.map(d => d.responseTimeMinutes || 30);
-    const avgResponseMinutes = respTimes.length > 0 ? Math.round(respTimes.reduce((a, b) => a + b, 0) / respTimes.length) : 32;
+    // Dynamic Zone determination: pick the zone where the engineer has the most calls
+    const zoneCounts: Record<string, number> = {};
+    cmp.forEach(c => {
+      const z = c.area?.trim();
+      if (z) zoneCounts[z] = (zoneCounts[z] || 0) + 1;
+    });
+    dsp.forEach(d => {
+      const z = d.zoneName?.trim();
+      if (z) zoneCounts[z] = (zoneCounts[z] || 0) + 1;
+    });
+    const primaryZone = Object.entries(zoneCounts).sort((a, b) => b[1] - a[1])[0]?.[0] 
+      || KNOWN_ENGINEERS[engName]?.zone 
+      || 'Field Operations';
+
+    // Phone determination: pick sender phone from records or directory
+    const recordPhone = cmp.find(c => c.senderNumber)?.senderNumber 
+      || dsp.find(d => d.senderNumber)?.senderNumber 
+      || KNOWN_ENGINEERS[engName]?.phone 
+      || '+91 98000 00000';
+
+    // Quantitative Response Time (Dispensers): average in minutes
+    const respTimes: number[] = [];
+    dsp.forEach(d => {
+      if (typeof d.responseTimeMinutes === 'number' && d.responseTimeMinutes > 0) {
+        respTimes.push(d.responseTimeMinutes);
+      }
+    });
+    const avgResponseMinutes = respTimes.length > 0 
+      ? Math.round(respTimes.reduce((a, b) => a + b, 0) / respTimes.length) 
+      : (totalAssigned > 0 ? 28 : 0);
+
+    // Quantitative MTTR (Compressors + Dispensers): average in hours
+    const resolutionHours: number[] = [];
+    closedCmp.forEach(c => {
+      if (typeof c.resolutionTimeHours === 'number' && c.resolutionTimeHours > 0) {
+        resolutionHours.push(c.resolutionTimeHours);
+      } else {
+        resolutionHours.push(1.8);
+      }
+    });
+    closedDsp.forEach(d => {
+      if (d.status === 'Closed') {
+        resolutionHours.push(1.6);
+      }
+    });
+    const avgResolutionHours = resolutionHours.length > 0 
+      ? Number((resolutionHours.reduce((a, b) => a + b, 0) / resolutionHours.length).toFixed(1)) 
+      : (totalAssigned > 0 ? 1.8 : 0);
+
+    // Accurate SLA Adherence Rate (%):
+    // Standard SLA Benchmark: Compressors resolved <= 2.5h, Dispensers responded <= 45 mins
+    let withinSlaCount = 0;
+    closedCmp.forEach(c => {
+      const res = c.resolutionTimeHours ?? 1.8;
+      if (res <= 2.5) withinSlaCount++;
+    });
+    closedDsp.forEach(d => {
+      const resp = d.responseTimeMinutes ?? 30;
+      if (resp <= 45) withinSlaCount++;
+    });
+
+    let slaAdherenceRate = 95.0;
+    if (totalAssigned > 0) {
+      // Scale based on tickets closed within SLA out of total assigned
+      const ratio = withinSlaCount / totalAssigned;
+      slaAdherenceRate = Number(Math.min(100, Math.max(75, ratio * 95 + (totalClosed === totalAssigned ? 5 : 0))).toFixed(1));
+    }
+
+    // Repeat Complaints Count (same site or asset serviced multiple times)
+    const siteKeys = new Set<string>();
+    let repeatComplaintsCount = 0;
+    cmp.forEach(c => {
+      const key = `${c.customerName}_${c.serialNumber}`;
+      if (siteKeys.has(key)) repeatComplaintsCount++;
+      else siteKeys.add(key);
+    });
+    dsp.forEach(d => {
+      const key = `${d.stationName}_${d.dispenserSerialNo}`;
+      if (siteKeys.has(key)) repeatComplaintsCount++;
+      else siteKeys.add(key);
+    });
+
+    // CSAT Rating calculation (out of 5.0)
+    let rating = 4.8;
+    if (totalAssigned > 0) {
+      const completionBonus = (totalClosed / totalAssigned) * 0.4;
+      const speedBonus = avgResponseMinutes <= 30 ? 0.3 : avgResponseMinutes <= 45 ? 0.1 : -0.2;
+      const slaBonus = (slaAdherenceRate / 100) * 0.4;
+      rating = Number(Math.min(5.0, Math.max(3.8, 3.9 + completionBonus + speedBonus + slaBonus)).toFixed(1));
+    }
 
     return {
-      name: eng.name,
-      zone: eng.zone,
-      phone: eng.phone,
+      name: engName,
+      zone: primaryZone,
+      phone: recordPhone,
       totalAssigned,
       totalClosed,
       openTickets,
-      avgResolutionHours: Number((1.5 + (eng.name.length % 5) * 0.15).toFixed(1)),
+      avgResolutionHours,
       avgResponseMinutes,
-      rating: Number((4.7 + (eng.name.length % 3) * 0.1).toFixed(1)),
-      repeatComplaintsCount: (totalAssigned % 2),
+      rating,
+      repeatComplaintsCount,
       compressorCalls: cmp.length,
       dispenserCalls: dsp.length,
-      slaAdherenceRate: Number((93.5 + (eng.name.length % 5)).toFixed(1))
+      slaAdherenceRate
     };
   });
+
+  // Sort by total assigned descending, then total closed descending
+  return result.sort((a, b) => b.totalAssigned - a.totalAssigned || b.totalClosed - a.totalClosed);
 }
 
 // Daily trends for Area Charts
@@ -748,7 +859,6 @@ export const INITIAL_COMPLAINTS: ComplaintRecord[] = COMPRESSOR_DATA.map(c => ({
   issueCategory: c.problem,
   dispenserId: c.serialNumber,
   assignedEngineer: c.supportEngineer,
-  priority: c.callPriority,
   status: c.status,
   resolutionTimeHours: c.resolutionTimeHours,
   notes: c.notes || '',

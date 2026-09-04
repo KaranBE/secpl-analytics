@@ -240,9 +240,9 @@ function createNewComplaint(data) {
     sheet.appendRow([
       "Ticket ID", "Timestamp", "Customer Name", "Customer Phone", 
       "Zone", "Location", "Issue Category", "Dispenser ID", 
-      "Assigned Engineer", "Priority", "Status", "Resolution Time (Hrs)", "Notes", "Source"
+      "Assigned Engineer", "Status", "Resolution Time (Hrs)", "Notes", "Source"
     ]);
-    sheet.getRange("A1:N1").setBackground("#0f766e").setFontColor("#ffffff").setFontWeight("bold");
+    sheet.getRange("A1:M1").setBackground("#0f766e").setFontColor("#ffffff").setFontWeight("bold");
   }
 
   const lastRow = sheet.getLastRow();
@@ -285,7 +285,6 @@ function createNewComplaint(data) {
     category,
     dispenserId,
     engineer,
-    category === "Power Tripping" || category === "Water Leakage" ? "High" : "Medium",
     "Open",
     "",
     data.text,

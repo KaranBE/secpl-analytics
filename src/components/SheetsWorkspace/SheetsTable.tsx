@@ -67,7 +67,6 @@ export const SheetsTable: React.FC<SheetsTableProps> = ({
     issueCategory: 'Water Leakage' as const,
     dispenserId: 'DISP-S04',
     assignedEngineer: 'Amit Sharma',
-    priority: 'Medium' as const,
     notes: ''
   });
 
@@ -82,9 +81,9 @@ export const SheetsTable: React.FC<SheetsTableProps> = ({
   const handleExportCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
     if (activeSheet === 'Complaints') {
-      csvContent += "Ticket ID,Timestamp,Customer,Phone,Zone,Location,Category,Dispenser ID,Engineer,Priority,Status,Resolution (Hrs),Notes\n";
+      csvContent += "Ticket ID,Timestamp,Customer,Phone,Zone,Location,Category,Dispenser ID,Engineer,Status,Resolution (Hrs),Notes\n";
       complaints.forEach(c => {
-        csvContent += `"${c.ticketNumber}","${c.timestamp}","${c.customerName}","${c.customerPhone}","${c.zone}","${c.location}","${c.issueCategory}","${c.dispenserId}","${c.assignedEngineer}","${c.priority}","${c.status}","${c.resolutionTimeHours || ''}","${c.notes.replace(/"/g, '""')}"\n`;
+        csvContent += `"${c.ticketNumber}","${c.timestamp}","${c.customerName}","${c.customerPhone}","${c.zone}","${c.location}","${c.issueCategory}","${c.dispenserId}","${c.assignedEngineer}","${c.status}","${c.resolutionTimeHours || ''}","${c.notes.replace(/"/g, '""')}"\n`;
       });
     } else if (activeSheet === 'Dispensers') {
       csvContent += "Dispenser Code,Model,Client Name,Zone,Location,Install Date,Last Service Date,Next Due Date,Filter Health %,UV Status,Status\n";
@@ -128,7 +127,6 @@ export const SheetsTable: React.FC<SheetsTableProps> = ({
       issueCategory: 'Water Leakage',
       dispenserId: 'DISP-S04',
       assignedEngineer: 'Amit Sharma',
-      priority: 'Medium',
       notes: ''
     });
   };
@@ -328,7 +326,6 @@ export const SheetsTable: React.FC<SheetsTableProps> = ({
                   <th className="py-3 px-3.5 border-r border-slate-200 font-semibold">Category</th>
                   <th className="py-3 px-3.5 border-r border-slate-200 font-semibold">Dispenser</th>
                   <th className="py-3 px-3.5 border-r border-slate-200 font-semibold">Engineer</th>
-                  <th className="py-3 px-3.5 border-r border-slate-200 font-semibold">Priority</th>
                   <th className="py-3 px-3.5 border-r border-slate-200 text-center font-semibold">Status</th>
                   <th className="py-3 px-3.5 font-semibold">Notes & Actions</th>
                 </tr>
@@ -360,15 +357,6 @@ export const SheetsTable: React.FC<SheetsTableProps> = ({
                     <td className="py-2.5 px-3.5 border-r border-slate-100 text-slate-700 font-sans">{c.issueCategory}</td>
                     <td className="py-2.5 px-3.5 border-r border-slate-100 text-slate-600 font-mono text-[11px]">{c.dispenserId}</td>
                     <td className="py-2.5 px-3.5 border-r border-slate-100 text-slate-900 font-sans font-medium">{c.assignedEngineer}</td>
-                    <td className="py-2.5 px-3.5 border-r border-slate-100">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-sans border ${
-                        c.priority === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                        c.priority === 'High' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                        'bg-slate-100 text-slate-700 border-slate-200'
-                      }`}>
-                        {c.priority}
-                      </span>
-                    </td>
                     <td className="py-2.5 px-3.5 border-r border-slate-100 text-center">
                       <select
                         value={c.status}
@@ -576,7 +564,7 @@ export const SheetsTable: React.FC<SheetsTableProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-700 font-semibold mb-1">Zone</label>
                   <select
@@ -603,19 +591,6 @@ export const SheetsTable: React.FC<SheetsTableProps> = ({
                     <option value="Cooling Fault">Cooling Fault</option>
                     <option value="Power Tripping">Power Tripping</option>
                     <option value="Dispenser Button Jam">Dispenser Button Jam</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Priority</label>
-                  <select
-                    value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all font-medium"
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                    <option value="Critical">Critical</option>
                   </select>
                 </div>
               </div>
