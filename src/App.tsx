@@ -194,6 +194,12 @@ export default function App() {
         setSyncError('Sign-in popup was blocked by your browser. Please allow popups or open this app in a new tab.');
         return;
       }
+      if (err?.code === 'auth/unauthorized-domain' || err?.message?.includes('unauthorized-domain')) {
+        const host = typeof window !== 'undefined' ? window.location.hostname : '';
+        console.warn(`[App] Google sign-in: Domain "${host}" requires registration in Firebase Console.`);
+        setSyncError(`auth/unauthorized-domain: ${host}`);
+        return;
+      }
       console.error('Google sign in error:', err);
       setSyncError(err?.message || 'Google sign-in could not be completed.');
     } finally {

@@ -1,14 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Activity, 
   ShieldCheck, 
   Lock, 
   AlertCircle, 
-  X,
-  CheckCircle2,
-  Users,
-  Eye,
-  Share2
+  X, 
+  CheckCircle2, 
+  Users, 
+  Eye, 
+  Share2,
+  ShieldAlert,
+  Copy,
+  Check,
+  ExternalLink
 } from 'lucide-react';
 import { DEFAULT_SHEET_OWNER_EMAIL } from '../services/googleSheets';
 
@@ -31,7 +35,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onContinueAsGuest,
   onOpenShareGuide
 }) => {
+  const [copiedDomain, setCopiedDomain] = useState(false);
+
   if (!isOpen) return null;
+
+  const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isUnauthorizedDomain = Boolean(
+    error && (
+      error.includes('unauthorized-domain') || 
+      error.includes('auth/unauthorized-domain') || 
+      error.includes('Domain not authorized')
+    )
+  );
+
+  const handleCopyHost = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && currentHost) {
+      navigator.clipboard.writeText(currentHost);
+      setCopiedDomain(true);
+      setTimeout(() => setCopiedDomain(false), 2500);
+    }
+  };
 
   return (
     <div 
@@ -86,7 +109,84 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         </div>
 
         {/* Error notification if any */}
-        {error && (
+        {isUnauthorizedDomain ? (
+          <div className="mt-5 p-4 rounded-2xl bg-amber-50/90 border border-amber-200 text-amber-950 text-xs space-y-3 shadow-2xs">
+            <div className="flex items-start gap-2.5">
+              <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-slate-900 block text-xs">
+                  Firebase Domain Authorization Required
+                </span>
+                <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                  Firebase requires your active web domain to be registered under Authorized Domains in the Firebase Console.
+                </p>
+              </div>
+            </div>
+
+            {/* Current Hostname with Copy Button */}
+            <div className="bg-white border border-amber-300/80 rounded-xl p-2.5 flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Domain to authorize</span>
+                <span className="font-mono text-xs text-slate-800 font-semibold truncate block select-all">
+                  {currentHost || 'Current App Domain'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyHost}
+                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs transition-colors cursor-pointer border border-indigo-200"
+                title="Copy host domain to clipboard"
+              >
+                {copiedDomain ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-emerald-700 font-bold">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy Domain</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Quick 3-step Instructions */}
+            <div className="space-y-1.5 text-[11px] text-slate-700 bg-amber-100/60 p-2.5 rounded-xl border border-amber-200/80">
+              <div className="font-bold text-slate-800 text-[11px]">How to register in Firebase:</div>
+              <ol className="list-decimal pl-4 space-y-1 text-slate-600">
+                <li>
+                  Open{' '}
+                  <a
+                    href="https://console.firebase.google.com/project/whatsapp-service-507413/authentication/settings"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-0.5 font-bold text-indigo-700 hover:text-indigo-900 underline"
+                  >
+                    Firebase Console Settings
+                    <ExternalLink className="w-2.5 h-2.5 inline" />
+                  </a>
+                </li>
+                <li>Go to <strong>Authentication &rarr; Settings &rarr; Authorized domains</strong></li>
+                <li>Click <strong>Add domain</strong>, paste the domain above, and click <strong>Save</strong>.</li>
+              </ol>
+            </div>
+
+            {/* Instant Fallback to Preview Mode */}
+            {onContinueAsGuest && (
+              <div className="pt-1 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">Need instant access?</span>
+                <button
+                  type="button"
+                  onClick={onContinueAsGuest}
+                  className="font-bold text-xs text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+                >
+                  Continue in Preview Mode &rarr;
+                </button>
+              </div>
+            )}
+          </div>
+        ) : error ? (
           <div className="mt-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <div className="leading-snug space-y-1">
@@ -103,7 +203,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               )}
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* Action Buttons */}
         <div className="mt-6 space-y-3">

@@ -80,6 +80,17 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
       throw blockedErr;
     }
 
+    // Handle unauthorized domain (needs Firebase console registration)
+    if (error?.code === 'auth/unauthorized-domain') {
+      const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
+      console.warn(`[Firebase Auth] Domain "${currentHost}" is not in Firebase Authorized Domains for project "whatsapp-service-507413".`);
+      const authErr = new Error(`Domain not authorized: "${currentHost}". Please register this domain in Firebase Console -> Authentication -> Settings -> Authorized domains, or continue in Preview Mode.`);
+      (authErr as any).code = 'auth/unauthorized-domain';
+      (authErr as any).domain = currentHost;
+      (authErr as any).projectId = 'whatsapp-service-507413';
+      throw authErr;
+    }
+
     console.error('Google Sign In error:', error);
     throw error;
   } finally {

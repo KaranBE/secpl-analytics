@@ -14,7 +14,8 @@ import {
   Share2,
   Users,
   ShieldCheck,
-  Eye
+  Eye,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   COMPRESSOR_SPREADSHEET_ID, 
@@ -85,8 +86,8 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
                     Live Connected
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                    Demo Fleet Mode
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    Preview Mode
                   </span>
                 )}
               </div>
@@ -218,14 +219,27 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
       {/* Sync / Access Permission Error Notice */}
       {syncError && (
         <div className={`mt-2.5 p-3 rounded-2xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-          isPermissionDenied 
+          syncError.includes('unauthorized-domain')
+            ? 'bg-amber-50 border border-amber-300 text-amber-950'
+            : isPermissionDenied 
             ? 'bg-amber-50 border border-amber-200 text-amber-900' 
             : 'bg-rose-50 border border-rose-200 text-rose-800'
         }`}>
           <div className="flex items-start gap-2.5">
-            <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${isPermissionDenied ? 'text-amber-600' : 'text-rose-600'}`} />
+            {syncError.includes('unauthorized-domain') ? (
+              <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+            ) : (
+              <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${isPermissionDenied ? 'text-amber-600' : 'text-rose-600'}`} />
+            )}
             <div>
-              {isPermissionDenied ? (
+              {syncError.includes('unauthorized-domain') ? (
+                <div className="space-y-0.5">
+                  <span className="font-bold block">Firebase Domain Authorization Required</span>
+                  <span className="text-slate-700 leading-relaxed block">
+                    This domain ({typeof window !== 'undefined' ? window.location.hostname : 'active host'}) needs to be registered in Firebase Console (Authentication &rarr; Settings &rarr; Authorized domains).
+                  </span>
+                </div>
+              ) : isPermissionDenied ? (
                 <div className="space-y-0.5">
                   <span className="font-bold block">Access Permission Needed for Live Sync</span>
                   <span className="text-amber-800 leading-relaxed block">
@@ -239,7 +253,29 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
-            {isPermissionDenied && onOpenShare && (
+            {syncError.includes('unauthorized-domain') ? (
+              <>
+                <a
+                  href="https://console.firebase.google.com/project/whatsapp-service-507413/authentication/settings"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[11px] font-semibold transition-colors cursor-pointer"
+                >
+                  <span>Firebase Settings</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+                {onSwitchToPreviewMode && (
+                  <button
+                    type="button"
+                    onClick={onSwitchToPreviewMode}
+                    className="px-2.5 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-[11px] font-semibold transition-colors cursor-pointer"
+                  >
+                    <Eye className="w-3 h-3 inline mr-1" />
+                    Preview Mode
+                  </button>
+                )}
+              </>
+            ) : isPermissionDenied && onOpenShare ? (
               <button
                 type="button"
                 onClick={onOpenShare}
@@ -247,9 +283,9 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
               >
                 Share & Permission Guide
               </button>
-            )}
+            ) : null}
 
-            {isPermissionDenied && onSwitchToPreviewMode && (
+            {!syncError.includes('unauthorized-domain') && isPermissionDenied && onSwitchToPreviewMode && (
               <button
                 type="button"
                 onClick={onSwitchToPreviewMode}
@@ -260,7 +296,7 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
               </button>
             )}
 
-            {isAuthenticated && (
+            {isAuthenticated && !syncError.includes('unauthorized-domain') && (
               <button
                 type="button"
                 onClick={onSync}

@@ -8,6 +8,7 @@ import {
   CustomerMetric,
   UnifiedIncidentRecord
 } from '../types';
+import { cleanEngineerName } from '../utils/cleanUtils';
 
 // =========================================================================
 // SHEET 1: COMPRESSOR DATA
@@ -682,30 +683,35 @@ export function computeEngineerMetrics(
   const engineerNameSet = new Set<string>();
 
   compressors.forEach(c => {
-    const name = c.supportEngineer?.trim();
-    if (name && name.toLowerCase() !== 'unassigned' && name !== '-') {
-      engineerNameSet.add(name);
+    const raw = c.supportEngineer?.trim();
+    if (raw && raw.toLowerCase() !== 'unassigned' && raw !== '-') {
+      const clean = cleanEngineerName(raw);
+      if (clean) engineerNameSet.add(clean);
     }
   });
 
   dispensers.forEach(d => {
-    const name = d.serviceEngineerName?.trim();
-    if (name && name.toLowerCase() !== 'unassigned' && name !== '-') {
-      engineerNameSet.add(name);
+    const raw = d.serviceEngineerName?.trim();
+    if (raw && raw.toLowerCase() !== 'unassigned' && raw !== '-') {
+      const clean = cleanEngineerName(raw);
+      if (clean) engineerNameSet.add(clean);
     }
   });
 
   // If no engineers found in current filtered subset, include known directory as fallback
   if (engineerNameSet.size === 0) {
-    Object.keys(KNOWN_ENGINEERS).forEach(name => engineerNameSet.add(name));
+    Object.keys(KNOWN_ENGINEERS).forEach(name => {
+      const clean = cleanEngineerName(name);
+      if (clean) engineerNameSet.add(clean);
+    });
   }
 
   const result: EngineerMetric[] = Array.from(engineerNameSet).map(engName => {
     const normName = engName.toLowerCase();
 
     // Match all compressor and dispenser records for this technician
-    const cmp = compressors.filter(c => (c.supportEngineer || '').trim().toLowerCase() === normName);
-    const dsp = dispensers.filter(d => (d.serviceEngineerName || '').trim().toLowerCase() === normName);
+    const cmp = compressors.filter(c => cleanEngineerName(c.supportEngineer || '').toLowerCase() === normName);
+    const dsp = dispensers.filter(d => cleanEngineerName(d.serviceEngineerName || '').toLowerCase() === normName);
 
     const totalAssigned = cmp.length + dsp.length;
     const closedCmp = cmp.filter(c => c.status === 'Closed');
