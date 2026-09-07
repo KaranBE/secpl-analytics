@@ -1,9 +1,41 @@
 import { CompressorRecord, DispenserSheetRecord, TicketStatus } from '../types';
 import { normalizeDateToISO } from '../utils/dateUtils';
-import { cleanEngineerName } from '../utils/cleanUtils';
+import { cleanEngineerName, isValidZone } from '../utils/cleanUtils';
 
 export const COMPRESSOR_SPREADSHEET_ID = '1BdifU1B_GzUgs5dkcadQMZhMuOcveG_41m7OSsQr0MU';
 export const DISPENSER_SPREADSHEET_ID = '16rYwtl9mx_kWun3q-CqvBx57o5bcovAGvlQSjYarIMU';
+export const DEFAULT_SHEET_OWNER_EMAIL = 'web@shahgroup.co';
+export const DEFAULT_SHARED_APP_URL = 'https://ais-pre-kcqnkh4h7zpzdjumgjo5gf-270031739203.asia-southeast1.run.app';
+
+export function getPublicSharedAppUrl(): string {
+  if (typeof window === 'undefined') return DEFAULT_SHARED_APP_URL;
+  const origin = window.location.origin;
+  if (!origin || origin.includes('aistudio.google.com')) {
+    return DEFAULT_SHARED_APP_URL;
+  }
+  if (origin.includes('ais-dev-')) {
+    return origin.replace('ais-dev-', 'ais-pre-');
+  }
+  return origin;
+}
+
+export function getGoogleSheetShareUrl(spreadsheetId: string): string {
+  return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit?usp=sharing`;
+}
+
+export class GoogleSheetsAccessError extends Error {
+  statusCode: number;
+  isPermissionDenied: boolean;
+  spreadsheetId: string;
+
+  constructor(message: string, statusCode: number, isPermissionDenied: boolean, spreadsheetId: string) {
+    super(message);
+    this.name = 'GoogleSheetsAccessError';
+    this.statusCode = statusCode;
+    this.isPermissionDenied = isPermissionDenied;
+    this.spreadsheetId = spreadsheetId;
+  }
+}
 
 export interface SpreadsheetInfo {
   id: string;
@@ -24,7 +56,24 @@ export async function getSpreadsheetInfo(spreadsheetId: string, accessToken: str
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Failed to fetch spreadsheet info (${response.status}): ${errorBody}`);
+    const isForbidden = response.status === 403 || errorBody.includes('PERMISSION_DENIED') || errorBody.includes('caller does not have permission');
+    const isNotFound = response.status === 404;
+    
+    if (isForbidden || isNotFound) {
+      throw new GoogleSheetsAccessError(
+        `Permission required: This Google account does not have read access to spreadsheet ${spreadsheetId}. The sheet owner (${DEFAULT_SHEET_OWNER_EMAIL}) must grant Viewer access.`,
+        response.status,
+        true,
+        spreadsheetId
+      );
+    }
+    
+    throw new GoogleSheetsAccessError(
+      `Failed to fetch spreadsheet info (${response.status}): ${errorBody}`,
+      response.status,
+      false,
+      spreadsheetId
+    );
   }
 
   const data = await response.json();
@@ -53,7 +102,24 @@ export async function getSheetValues(spreadsheetId: string, sheetTitle: string, 
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Failed to fetch sheet values (${response.status}): ${errorBody}`);
+    const isForbidden = response.status === 403 || errorBody.includes('PERMISSION_DENIED') || errorBody.includes('caller does not have permission');
+    const isNotFound = response.status === 404;
+
+    if (isForbidden || isNotFound) {
+      throw new GoogleSheetsAccessError(
+        `Permission required to read tab "${sheetTitle}" in sheet ${spreadsheetId}. The sheet owner (${DEFAULT_SHEET_OWNER_EMAIL}) must grant Viewer access.`,
+        response.status,
+        true,
+        spreadsheetId
+      );
+    }
+
+    throw new GoogleSheetsAccessError(
+      `Failed to fetch sheet values (${response.status}): ${errorBody}`,
+      response.status,
+      false,
+      spreadsheetId
+    );
   }
 
   const data = await response.json();
@@ -155,7 +221,7 @@ export async function fetchLiveCompressorRecords(
   const headers = rawRows[0];
   const dateIdx = findColIndex(headers, ['date', 'calldate', 'logdate'], ['time', 'stamp', 'hour']);
   const custIdx = findColIndex(headers, ['customer', 'client', 'name']);
-  const areaIdx = findColIndex(headers, ['area', 'zone', 'location', 'region']);
+  const areaIdx = findColIndex(headers, ['area', 'zone', 'location', 'region'], ['time', 'stamp', 'date', 'num', 'no', 'phone', 'mobile', 'serial', 'id', 'sender']);
   const modelIdx = findColIndex(headers, ['model', 'equipment', 'compressormodel']);
   const serialIdx = findColIndex(headers, ['serial', 'serialnumber', 'srno', 'sn']);
   const problemIdx = findColIndex(
@@ -197,11 +263,14 @@ export async function fetchLiveCompressorRecords(
       compProblem = 'General Compressor Maintenance';
     }
 
+    const rawArea = (areaIdx >= 0 ? row[areaIdx] : '')?.trim();
+    const area = isValidZone(rawArea) ? rawArea : 'General Area';
+
     records.push({
       id: `CMP-GS-${r + 100}`,
       date: normalizeDateToISO(dateIdx >= 0 ? row[dateIdx] : undefined),
       customerName: (custIdx >= 0 ? row[custIdx] : '')?.trim() || `Customer ${r}`,
-      area: (areaIdx >= 0 ? row[areaIdx] : '')?.trim() || 'General Area',
+      area,
       model: (modelIdx >= 0 ? row[modelIdx] : '')?.trim() || 'Standard Compressor',
       serialNumber: (serialIdx >= 0 ? row[serialIdx] : '')?.trim() || `SN-CMP-${r}`,
       problem: compProblem,
@@ -248,7 +317,7 @@ export async function fetchLiveDispenserRecords(
   const compTimeIdx = findColIndex(headers, ['complainttime', 'calltime', 'logtime', 'time']);
   const reachTimeIdx = findColIndex(headers, ['reachtime', 'arrivaltime', 'arrival', 'responsetime']);
   const closeTimeIdx = findColIndex(headers, ['closetime', 'resolutiontime', 'completedtime', 'endtime']);
-  const zoneIdx = findColIndex(headers, ['zonename', 'zone', 'area', 'region']);
+  const zoneIdx = findColIndex(headers, ['zonename', 'zone', 'area', 'region'], ['time', 'stamp', 'date', 'num', 'no', 'phone', 'mobile', 'serial', 'id', 'sender']);
   const engIdx = findColIndex(headers, ['serviceengineer', 'engineername', 'engineer', 'technician', 'assigned']);
   
   // Specific search for Problem, strictly excluding time, date, numbers, and metadata
@@ -348,6 +417,9 @@ export async function fetchLiveDispenserRecords(
       }
     }
 
+    const rawZone = (zoneIdx >= 0 ? row[zoneIdx] : '')?.trim();
+    const zoneName = isValidZone(rawZone) ? rawZone : 'North Zone';
+
     records.push({
       id: `DSP-GS-${r + 200}`,
       date: normalizeDateToISO(dateIdx >= 0 ? row[dateIdx] : undefined),
@@ -357,7 +429,7 @@ export async function fetchLiveDispenserRecords(
       complaintTime: (compTimeIdx >= 0 ? row[compTimeIdx] : '')?.trim() || '09:00 AM',
       reachTime: (reachTimeIdx >= 0 ? row[reachTimeIdx] : '')?.trim() || '09:40 AM',
       closeTime: rawCloseTime || (status === 'Closed' ? '11:30 AM' : '-'),
-      zoneName: (zoneIdx >= 0 ? row[zoneIdx] : '')?.trim() || 'North Zone',
+      zoneName,
       serviceEngineerName: cleanEngineerName(engIdx >= 0 ? row[engIdx] : '') || 'Service Lead',
       problem: problemVal,
       whatsappMessageId: (wamidIdx >= 0 ? row[wamidIdx] : '')?.trim() || `wamid.DSP_GS_${r}`,

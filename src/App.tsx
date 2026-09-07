@@ -30,7 +30,7 @@ import {
   DISPENSER_SPREADSHEET_ID
 } from './services/googleSheets';
 import { normalizeDateToISO } from './utils/dateUtils';
-import { cleanEngineerName } from './utils/cleanUtils';
+import { cleanEngineerName, isValidZone } from './utils/cleanUtils';
 import { Header } from './components/Header';
 import { Sidebar, DashboardNavTab } from './components/Sidebar';
 import { FilterBar } from './components/FilterBar';
@@ -40,6 +40,8 @@ import { ZoneAnalytics } from './components/Dashboard/ZoneAnalytics';
 import { EngineerAnalytics } from './components/Dashboard/EngineerAnalytics';
 import { CustomerAnalytics } from './components/Dashboard/CustomerAnalytics';
 import { LoginModal } from './components/LoginModal';
+import { ShareAnalyticsModal } from './components/ShareAnalyticsModal';
+import { DEFAULT_SHEET_OWNER_EMAIL } from './services/googleSheets';
 
 export default function App() {
   // Navigation & UI States
@@ -52,6 +54,9 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(false);
   const [showLoginModal, setShowLoginModal] = useState<boolean>(true);
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [isPermissionDenied, setIsPermissionDenied] = useState<boolean>(false);
+  const [previewModeActive, setPreviewModeActive] = useState<boolean>(false);
   const [isSyncingSheets, setIsSyncingSheets] = useState<boolean>(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -79,6 +84,7 @@ export default function App() {
   const syncLiveSheets = useCallback(async (token: string) => {
     setIsSyncingSheets(true);
     setSyncError(null);
+    setIsPermissionDenied(false);
     try {
       const [compRes, dispRes] = await Promise.allSettled([
         fetchLiveCompressorRecords(COMPRESSOR_SPREADSHEET_ID, token),
@@ -87,6 +93,7 @@ export default function App() {
 
       let compLoaded = false;
       let dispLoaded = false;
+      let hasPermissionIssue = false;
       const errors: string[] = [];
 
       if (compRes.status === 'fulfilled') {
@@ -96,7 +103,11 @@ export default function App() {
         }
         setCompressorSheetTitle(compRes.value.sheetTitle);
       } else {
-        errors.push(`Compressor Sheet: ${compRes.reason?.message || 'Access error'}`);
+        const msg = compRes.reason?.message || 'Access error';
+        if (msg.includes('Permission required') || msg.includes('403') || compRes.reason?.isPermissionDenied) {
+          hasPermissionIssue = true;
+        }
+        errors.push(`Compressor Sheet: ${msg}`);
       }
 
       if (dispRes.status === 'fulfilled') {
@@ -106,18 +117,33 @@ export default function App() {
         }
         setDispenserSheetTitle(dispRes.value.sheetTitle);
       } else {
-        errors.push(`Dispenser Sheet: ${dispRes.reason?.message || 'Access error'}`);
+        const msg = dispRes.reason?.message || 'Access error';
+        if (msg.includes('Permission required') || msg.includes('403') || dispRes.reason?.isPermissionDenied) {
+          hasPermissionIssue = true;
+        }
+        errors.push(`Dispenser Sheet: ${msg}`);
       }
 
       if (errors.length > 0 && !compLoaded && !dispLoaded) {
-        setSyncError(errors.join(' | '));
+        if (hasPermissionIssue) {
+          setIsPermissionDenied(true);
+          setSyncError(`Signed-in account requires Viewer permissions from sheet owner (${DEFAULT_SHEET_OWNER_EMAIL}). You can request access, view sharing guide, or continue in Preview Mode.`);
+        } else {
+          setSyncError(errors.join(' | '));
+        }
       } else {
         const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastSyncedAt(timeNow);
       }
     } catch (err: any) {
       console.error('Error syncing Google Sheets:', err);
-      setSyncError(err?.message || 'Failed to sync Google Sheets');
+      const msg = err?.message || 'Failed to sync Google Sheets';
+      if (msg.includes('Permission required') || msg.includes('403') || err?.isPermissionDenied) {
+        setIsPermissionDenied(true);
+        setSyncError(`Signed-in account requires Viewer permissions from sheet owner (${DEFAULT_SHEET_OWNER_EMAIL}).`);
+      } else {
+        setSyncError(msg);
+      }
     } finally {
       setIsSyncingSheets(false);
     }
@@ -200,8 +226,16 @@ export default function App() {
   // Available unique Zones & Engineers for filter dropdowns
   const availableZones = useMemo(() => {
     const zones = new Set<string>();
-    compressorData.forEach(c => zones.add(c.area));
-    dispenserData.forEach(d => zones.add(d.zoneName));
+    compressorData.forEach(c => {
+      if (c.area && isValidZone(c.area)) {
+        zones.add(c.area.trim());
+      }
+    });
+    dispenserData.forEach(d => {
+      if (d.zoneName && isValidZone(d.zoneName)) {
+        zones.add(d.zoneName.trim());
+      }
+    });
     return Array.from(zones).sort();
   }, [compressorData, dispenserData]);
 
@@ -395,14 +429,15 @@ export default function App() {
   return (
     <div className="relative min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-indigo-500 selection:text-white">
       {/* Background Screen: Blurred when login modal is active */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${showLoginModal ? 'filter blur-[4px] pointer-events-none select-none opacity-85' : ''}`}>
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${(showLoginModal && !previewModeActive) ? 'filter blur-[4px] pointer-events-none select-none opacity-85' : ''}`}>
         {/* Top Header */}
         <Header
           isMobileMenuOpen={isMobileMenuOpen}
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           user={user}
-          isLiveSynced={isAuthenticated && !!lastSyncedAt}
+          isLiveSynced={isAuthenticated && !!lastSyncedAt && !isPermissionDenied}
           onOpenLogin={() => setShowLoginModal(true)}
+          onOpenShare={() => setIsShareModalOpen(true)}
         />
 
         {/* Google Sheets Live Sync Bar */}
@@ -412,6 +447,7 @@ export default function App() {
           isLoading={isLoadingAuth}
           isSyncing={isSyncingSheets}
           syncError={syncError}
+          isPermissionDenied={isPermissionDenied}
           lastSyncedAt={lastSyncedAt}
           compressorRowCount={compressorData.length}
           dispenserRowCount={dispenserData.length}
@@ -420,6 +456,12 @@ export default function App() {
           onSignIn={() => setShowLoginModal(true)}
           onSignOut={handleSignOut}
           onSync={handleManualSync}
+          onOpenShare={() => setIsShareModalOpen(true)}
+          onSwitchToPreviewMode={() => {
+            setIsPermissionDenied(false);
+            setSyncError(null);
+            setPreviewModeActive(true);
+          }}
         />
 
         {/* Main Container with Sidebar Layout */}
@@ -530,11 +572,34 @@ export default function App() {
 
       {/* Centered Login Modal with Blurred Background Screen */}
       <LoginModal
-        isOpen={showLoginModal}
+        isOpen={showLoginModal && !previewModeActive}
         isLoading={isLoadingAuth}
         error={syncError}
         onSignIn={handleSignIn}
         onClose={() => setShowLoginModal(false)}
+        onContinueAsGuest={() => {
+          setShowLoginModal(false);
+          setPreviewModeActive(true);
+        }}
+        onOpenShareGuide={() => {
+          setShowLoginModal(false);
+          setIsShareModalOpen(true);
+        }}
+      />
+
+      {/* Share Analytics & Team Access Guidance Modal */}
+      <ShareAnalyticsModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        currentUser={user}
+        hasPermissionError={isPermissionDenied}
+        onSwitchToPreviewMode={() => {
+          setIsPermissionDenied(false);
+          setSyncError(null);
+          setPreviewModeActive(true);
+          setIsShareModalOpen(false);
+        }}
+        onRetrySync={handleManualSync}
       />
     </div>
   );

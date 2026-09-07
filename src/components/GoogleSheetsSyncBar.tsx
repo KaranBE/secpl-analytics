@@ -10,9 +10,17 @@ import {
   LogOut,
   Sliders,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Share2,
+  Users,
+  ShieldCheck,
+  Eye
 } from 'lucide-react';
-import { COMPRESSOR_SPREADSHEET_ID, DISPENSER_SPREADSHEET_ID } from '../services/googleSheets';
+import { 
+  COMPRESSOR_SPREADSHEET_ID, 
+  DISPENSER_SPREADSHEET_ID,
+  DEFAULT_SHEET_OWNER_EMAIL 
+} from '../services/googleSheets';
 
 interface GoogleSheetsSyncBarProps {
   user: User | null;
@@ -20,6 +28,7 @@ interface GoogleSheetsSyncBarProps {
   isLoading: boolean;
   isSyncing: boolean;
   syncError: string | null;
+  isPermissionDenied?: boolean;
   lastSyncedAt: string | null;
   compressorRowCount: number;
   dispenserRowCount: number;
@@ -28,6 +37,8 @@ interface GoogleSheetsSyncBarProps {
   onSignIn: () => void;
   onSignOut: () => void;
   onSync: () => void;
+  onOpenShare?: () => void;
+  onSwitchToPreviewMode?: () => void;
 }
 
 export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
@@ -36,6 +47,7 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
   isLoading,
   isSyncing,
   syncError,
+  isPermissionDenied = false,
   lastSyncedAt,
   compressorRowCount,
   dispenserRowCount,
@@ -43,7 +55,9 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
   dispenserSheetTitle,
   onSignIn,
   onSignOut,
-  onSync
+  onSync,
+  onOpenShare,
+  onSwitchToPreviewMode
 }) => {
   const [showDetails, setShowDetails] = useState(false);
 
@@ -119,7 +133,7 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
           </div>
         </div>
 
-        {/* Right: Actions (Sign In or Sync / User info) */}
+        {/* Right: Actions (Sign In or Sync / User info / Share) */}
         <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
           {isAuthenticated ? (
             <div className="flex items-center gap-2">
@@ -131,6 +145,18 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                 <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
               </button>
+
+              {onOpenShare && (
+                <button
+                  type="button"
+                  onClick={onOpenShare}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-indigo-600 text-xs font-medium transition-colors cursor-pointer"
+                  title="Share access with another email address"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="hidden sm:inline">Share</span>
+                </button>
+              )}
 
               <button
                 onClick={() => setShowDetails(!showDetails)}
@@ -152,6 +178,17 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
             </div>
           ) : (
             <div className="flex items-center gap-2">
+              {onOpenShare && (
+                <button
+                  type="button"
+                  onClick={onOpenShare}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-indigo-600 text-xs font-semibold shadow-2xs transition-colors cursor-pointer mr-1"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Share Analytics</span>
+                </button>
+              )}
+
               {/* Official Google Sign-In button per workspace-integration skill */}
               <button 
                 type="button" 
@@ -178,83 +215,147 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
         </div>
       </div>
 
-      {/* Sync Error Notice */}
+      {/* Sync / Access Permission Error Notice */}
       {syncError && (
-        <div className="mt-2.5 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{syncError}</span>
+        <div className={`mt-2.5 p-3 rounded-2xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+          isPermissionDenied 
+            ? 'bg-amber-50 border border-amber-200 text-amber-900' 
+            : 'bg-rose-50 border border-rose-200 text-rose-800'
+        }`}>
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${isPermissionDenied ? 'text-amber-600' : 'text-rose-600'}`} />
+            <div>
+              {isPermissionDenied ? (
+                <div className="space-y-0.5">
+                  <span className="font-bold block">Access Permission Needed for Live Sync</span>
+                  <span className="text-amber-800 leading-relaxed block">
+                    {syncError}
+                  </span>
+                </div>
+              ) : (
+                <span>{syncError}</span>
+              )}
+            </div>
           </div>
-          {isAuthenticated && (
-            <button
-              onClick={onSync}
-              className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-semibold cursor-pointer shrink-0"
-            >
-              Retry Sync
-            </button>
-          )}
+
+          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+            {isPermissionDenied && onOpenShare && (
+              <button
+                type="button"
+                onClick={onOpenShare}
+                className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[11px] font-semibold transition-colors cursor-pointer"
+              >
+                Share & Permission Guide
+              </button>
+            )}
+
+            {isPermissionDenied && onSwitchToPreviewMode && (
+              <button
+                type="button"
+                onClick={onSwitchToPreviewMode}
+                className="px-2.5 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-[11px] font-semibold transition-colors cursor-pointer"
+              >
+                <Eye className="w-3 h-3 inline mr-1" />
+                Preview Mode
+              </button>
+            )}
+
+            {isAuthenticated && (
+              <button
+                type="button"
+                onClick={onSync}
+                className={`px-2.5 py-1.5 text-white rounded-xl text-[11px] font-semibold transition-colors cursor-pointer ${
+                  isPermissionDenied ? 'bg-amber-700 hover:bg-amber-800' : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                Retry Sync
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       {/* Expandable Details Drawer */}
       {showDetails && isAuthenticated && (
-        <div className="mt-3 pt-3 border-t border-slate-200/80 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-          {/* Compressor Sheet Card */}
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5 text-indigo-600" />
-                Sheet 1: Compressor Records
-              </span>
-              <span className="font-semibold text-indigo-600 font-mono text-[11px]">
-                {compressorRowCount} rows loaded
+        <div className="mt-3 pt-3 border-t border-slate-200/80 space-y-3 text-xs">
+          {/* Ownership & Sharing Info Header */}
+          <div className="p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 text-indigo-900">
+              <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>
+                Underlying Sheets Owner: <strong className="font-semibold">{DEFAULT_SHEET_OWNER_EMAIL}</strong>
               </span>
             </div>
-            <div className="text-[11px] text-slate-500 font-mono break-all">
-              ID: {COMPRESSOR_SPREADSHEET_ID}
-            </div>
-            {compressorSheetTitle && (
-              <div className="text-[11px] text-slate-600">
-                Active Tab: <span className="font-semibold">{compressorSheetTitle}</span>
-              </div>
+            {onOpenShare && (
+              <button
+                type="button"
+                onClick={onOpenShare}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+              >
+                <Share2 className="w-3 h-3" />
+                <span>Share with Another Email Address</span>
+              </button>
             )}
-            <a
-              href={`https://docs.google.com/spreadsheets/d/${COMPRESSOR_SPREADSHEET_ID}/edit`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center gap-1 mt-1"
-            >
-              Open in Google Sheets <ExternalLink className="w-3 h-3" />
-            </a>
           </div>
 
-          {/* Dispenser Sheet Card */}
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5 text-emerald-600" />
-                Sheet 2: Dispenser Records
-              </span>
-              <span className="font-semibold text-emerald-600 font-mono text-[11px]">
-                {dispenserRowCount} rows loaded
-              </span>
-            </div>
-            <div className="text-[11px] text-slate-500 font-mono break-all">
-              ID: {DISPENSER_SPREADSHEET_ID}
-            </div>
-            {dispenserSheetTitle && (
-              <div className="text-[11px] text-slate-600">
-                Active Tab: <span className="font-semibold">{dispenserSheetTitle}</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Compressor Sheet Card */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-indigo-600" />
+                  Sheet 1: Compressor Records
+                </span>
+                <span className="font-semibold text-indigo-600 font-mono text-[11px]">
+                  {compressorRowCount} rows loaded
+                </span>
               </div>
-            )}
-            <a
-              href={`https://docs.google.com/spreadsheets/d/${DISPENSER_SPREADSHEET_ID}/edit`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] text-emerald-600 hover:text-emerald-800 font-medium inline-flex items-center gap-1 mt-1"
-            >
-              Open in Google Sheets <ExternalLink className="w-3 h-3" />
-            </a>
+              <div className="text-[11px] text-slate-500 font-mono break-all">
+                ID: {COMPRESSOR_SPREADSHEET_ID}
+              </div>
+              {compressorSheetTitle && (
+                <div className="text-[11px] text-slate-600">
+                  Active Tab: <span className="font-semibold">{compressorSheetTitle}</span>
+                </div>
+              )}
+              <a
+                href={`https://docs.google.com/spreadsheets/d/${COMPRESSOR_SPREADSHEET_ID}/edit`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center gap-1 mt-1"
+              >
+                Open in Google Sheets <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+
+            {/* Dispenser Sheet Card */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-emerald-600" />
+                  Sheet 2: Dispenser Records
+                </span>
+                <span className="font-semibold text-emerald-600 font-mono text-[11px]">
+                  {dispenserRowCount} rows loaded
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-500 font-mono break-all">
+                ID: {DISPENSER_SPREADSHEET_ID}
+              </div>
+              {dispenserSheetTitle && (
+                <div className="text-[11px] text-slate-600">
+                  Active Tab: <span className="font-semibold">{dispenserSheetTitle}</span>
+                </div>
+              )}
+              <a
+                href={`https://docs.google.com/spreadsheets/d/${DISPENSER_SPREADSHEET_ID}/edit`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-emerald-600 hover:text-emerald-800 font-medium inline-flex items-center gap-1 mt-1"
+              >
+                Open in Google Sheets <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
           </div>
         </div>
       )}

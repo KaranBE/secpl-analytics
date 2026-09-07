@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Calendar, 
   MapPin, 
@@ -16,7 +16,7 @@ import {
   Filter
 } from 'lucide-react';
 import { DashboardFilters, DatePreset, EquipmentType, ViewMode } from '../types';
-import { cleanEngineerName } from '../utils/cleanUtils';
+import { cleanEngineerName, isValidZone } from '../utils/cleanUtils';
 
 interface FilterBarProps {
   filters: DashboardFilters;
@@ -111,10 +111,19 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     });
   };
 
+  // Filter out any invalid, purely numeric, or "number" options from zones
+  const validZones = useMemo(() => {
+    return availableZones.filter(isValidZone);
+  }, [availableZones]);
+
+  const activeValidZones = useMemo(() => {
+    return filters.zones.filter(isValidZone);
+  }, [filters.zones]);
+
   const handleSelectAllZones = () => {
     onFilterChange({
       ...filters,
-      zones: filters.zones.length === availableZones.length ? [] : [...availableZones]
+      zones: activeValidZones.length === validZones.length ? [] : [...validZones]
     });
   };
 
@@ -137,13 +146,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     });
   };
 
-  const isAllZonesSelected = availableZones.length > 0 && filters.zones.length === availableZones.length;
+  const isAllZonesSelected = validZones.length > 0 && activeValidZones.length === validZones.length;
   const isAllEngineersSelected = availableEngineers.length > 0 && filters.engineers.length === availableEngineers.length;
 
   const zoneDisplayText = 
-    filters.zones.length === 0 || isAllZonesSelected
+    activeValidZones.length === 0 || isAllZonesSelected
       ? 'All'
-      : filters.zones.join(', ');
+      : activeValidZones.join(', ');
 
   const engineerDisplayText = 
     filters.engineers.length === 0 || isAllEngineersSelected
@@ -152,12 +161,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
   const isFiltered = 
     filters.datePreset !== 'all' || 
-    filters.zones.length > 0 || 
+    activeValidZones.length > 0 || 
     filters.engineers.length > 0 || 
     filters.status !== 'All' ||
     filters.equipmentType !== 'All';
 
-  const filteredZonesList = availableZones.filter(z => 
+  const filteredZonesList = validZones.filter(z => 
     z.toLowerCase().includes(zoneSearch.toLowerCase())
   );
 
@@ -318,11 +327,6 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               <MapPin className="w-3 h-3 text-indigo-600" />
               Zone Filter (Multi-Select)
             </span>
-            {filters.zones.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
-                {isAllZonesSelected ? 'All' : `${filters.zones.length} selected`}
-              </span>
-            )}
           </label>
 
           <button
@@ -355,9 +359,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                   onClick={handleSelectAllZones}
                   className="hover:underline cursor-pointer"
                 >
-                  {filters.zones.length === availableZones.length ? 'Deselect All' : 'Select All Zones'}
+                  {activeValidZones.length === validZones.length ? 'Deselect All' : 'Select All Zones'}
                 </button>
-                {filters.zones.length > 0 && (
+                {activeValidZones.length > 0 && (
                   <button
                     type="button"
                     onClick={() => onFilterChange({ ...filters, zones: [] })}

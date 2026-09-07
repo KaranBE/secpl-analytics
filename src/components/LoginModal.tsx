@@ -5,8 +5,12 @@ import {
   Lock, 
   AlertCircle, 
   X,
-  CheckCircle2
+  CheckCircle2,
+  Users,
+  Eye,
+  Share2
 } from 'lucide-react';
+import { DEFAULT_SHEET_OWNER_EMAIL } from '../services/googleSheets';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -14,6 +18,8 @@ interface LoginModalProps {
   error: string | null;
   onSignIn: () => void;
   onClose?: () => void;
+  onContinueAsGuest?: () => void;
+  onOpenShareGuide?: () => void;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
@@ -21,7 +27,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   isLoading,
   error,
   onSignIn,
-  onClose
+  onClose,
+  onContinueAsGuest,
+  onOpenShareGuide
 }) => {
   if (!isOpen) return null;
 
@@ -79,28 +87,56 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
         {/* Error notification if any */}
         {error && (
-          <div className="mt-5 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
+          <div className="mt-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-            <div className="leading-snug">
+            <div className="leading-snug space-y-1">
               <span className="font-semibold block">Authentication Notice</span>
-              {error}
+              <p>{error}</p>
+              {onContinueAsGuest && (
+                <button
+                  type="button"
+                  onClick={onContinueAsGuest}
+                  className="mt-1 inline-flex items-center gap-1 font-bold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+                >
+                  Click here to Explore in Preview Mode instead &rarr;
+                </button>
+              )}
             </div>
           </div>
         )}
 
-        {/* Action Button: Sign in with Google */}
+        {/* Action Buttons */}
         <div className="mt-6 space-y-3">
+          {/* Quick Instant Preview Mode (Recommended for external users/clients/gmail) */}
+          {onContinueAsGuest && (
+            <button
+              type="button"
+              id="continue-preview-mode-btn"
+              onClick={onContinueAsGuest}
+              className="w-full h-12 flex items-center justify-between px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Eye className="w-4 h-4 text-indigo-200 group-hover:scale-110 transition-transform" />
+                <span>Explore in Preview Mode</span>
+              </div>
+              <span className="text-[10px] bg-indigo-500/80 px-2 py-0.5 rounded-full text-indigo-100 font-medium">
+                Instant Access &bull; No Login Needed
+              </span>
+            </button>
+          )}
+
+          {/* Google Sign In */}
           <button
             type="button"
             id="google-signin-primary-btn"
             onClick={onSignIn}
             disabled={isLoading}
-            className="w-full h-12 flex items-center justify-center gap-3 px-4 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-800 font-semibold text-sm rounded-2xl border border-slate-300/90 shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed group"
+            className="w-full h-11 flex items-center justify-center gap-3 px-4 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-800 font-semibold text-xs rounded-2xl border border-slate-300 shadow-2xs hover:border-slate-400 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed group"
           >
             {isLoading ? (
-              <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
             ) : (
-              <svg className="w-5 h-5 shrink-0" viewBox="0 0 48 48">
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 48 48">
                 <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
                 <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
                 <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
@@ -108,33 +144,55 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <path fill="none" d="M0 0h48v48H0z" />
               </svg>
             )}
-            <span>{isLoading ? 'Signing in with Google...' : 'Sign in with Google'}</span>
+            <span>{isLoading ? 'Connecting...' : 'Sign in with Google'}</span>
           </button>
         </div>
 
-        {/* Key Features & Permissions List */}
-        <div className="mt-6 pt-5 border-t border-slate-100 space-y-2.5">
-          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-left">
-            Included Capabilities
+        {/* Sharing with another email address card */}
+        <div className="mt-4 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-bold flex items-center gap-1.5 text-slate-800">
+              <Users className="w-3.5 h-3.5 text-indigo-600" />
+              Live Sheets Permissions
+            </span>
+            {onOpenShareGuide && (
+              <button
+                type="button"
+                onClick={onOpenShareGuide}
+                className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+              >
+                Sharing Guide
+              </button>
+            )}
           </div>
-          <ul className="space-y-2 text-xs text-slate-600">
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            The Google Sheets are owned by <span className="font-semibold text-slate-800">{DEFAULT_SHEET_OWNER_EMAIL}</span>. To sync live data, the owner must share the sheets with Viewer permissions.
+          </p>
+        </div>
+
+        {/* Key Features & Permissions List */}
+        <div className="mt-5 pt-4 border-t border-slate-100 space-y-2">
+          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-left">
+            Platform Capabilities
+          </div>
+          <ul className="space-y-1.5 text-xs text-slate-600">
             <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
               <span>Dual-Sheet sync: Compressor & Dispenser fleets</span>
             </li>
             <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
               <span>Real-time engineer MTTR and SLA performance</span>
             </li>
             <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Automated WhatsApp incident logging stream</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <span>Multi-account sharing & executive viewer mode</span>
             </li>
           </ul>
         </div>
 
         {/* Security / Privacy Footer */}
-        <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
           <Lock className="w-3 h-3 text-slate-400 shrink-0" />
           <span>Secured via Google Workspace OAuth 2.0</span>
         </div>

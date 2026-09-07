@@ -15,7 +15,10 @@ import {
   Search,
   MapPin,
   Flame,
-  Zap
+  Zap,
+  Map,
+  Filter,
+  X
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -29,6 +32,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
+import { IndiaZoneMap } from './IndiaZoneMap';
 
 interface ZoneAnalyticsProps {
   zoneMetrics: ZoneMetric[];
@@ -43,12 +47,19 @@ export const ZoneAnalytics: React.FC<ZoneAnalyticsProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedZone, setSelectedZone] = useState<ZoneMetric | null>(null);
+  const [auditModalZone, setAuditModalZone] = useState<ZoneMetric | null>(null);
+  const [graphicalSubMode, setGraphicalSubMode] = useState<'all' | 'map' | 'charts'>('all');
 
-  const filteredZones = zoneMetrics.filter(z => 
-    z.zone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    z.leadEngineer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    z.topProblem.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredZones = zoneMetrics.filter(z => {
+    const matchesSearch = 
+      z.zone.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      z.leadEngineer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      z.topProblem.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesZoneFilter = !selectedZone || z.zone === selectedZone.zone;
+
+    return matchesSearch && matchesZoneFilter;
+  });
 
   const chartData = zoneMetrics.map(z => ({
     name: z.zone.replace(' Zone', ''),
@@ -77,10 +88,23 @@ export const ZoneAnalytics: React.FC<ZoneAnalyticsProps> = ({
             Regional & Zone Operational Analytics
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Workload distribution, SLA adherence benchmarks, and resolution velocity across all operational territories
+            Interactive India territory map, workload distribution, SLA adherence benchmarks, and resolution velocity
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {selectedZone && (
+            <span className="text-xs font-semibold text-amber-800 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 flex items-center gap-1.5">
+              Filtered: {selectedZone.zone}
+              <button
+                type="button"
+                onClick={() => setSelectedZone(null)}
+                className="hover:text-amber-950 font-bold ml-1 cursor-pointer"
+                title="Clear filter"
+              >
+                &times;
+              </button>
+            </span>
+          )}
           <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
             94.2% Regional SLA Baseline
           </span>
@@ -90,15 +114,28 @@ export const ZoneAnalytics: React.FC<ZoneAnalyticsProps> = ({
       {/* Regional Zone Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {zoneMetrics.map(zone => {
+          const isSelected = selectedZone?.zone === zone.zone;
           return (
             <div 
               key={zone.zone} 
-              onClick={() => setSelectedZone(zone)}
-              className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-xs hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer space-y-2"
+              onClick={() => setSelectedZone(isSelected ? null : zone)}
+              className={`bg-white border rounded-xl p-3 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-2 relative ${
+                isSelected 
+                  ? 'border-indigo-600 ring-2 ring-indigo-500/20 bg-indigo-50/20' 
+                  : 'border-slate-200/90 hover:border-indigo-300'
+              }`}
             >
+              {isSelected && (
+                <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-indigo-600 ring-2 ring-indigo-200" />
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                  <span className={`w-2 h-2 rounded-full ${
+                    zone.zone === 'North Zone' ? 'bg-blue-500' :
+                    zone.zone === 'West Zone' ? 'bg-indigo-500' :
+                    zone.zone === 'Central Zone' ? 'bg-amber-500' :
+                    zone.zone === 'East Zone' ? 'bg-purple-500' : 'bg-teal-500'
+                  }`}></span>
                   {zone.zone.replace(' Zone', '')}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
@@ -141,70 +178,143 @@ export const ZoneAnalytics: React.FC<ZoneAnalyticsProps> = ({
 
       {/* GRAPHICAL DATA VIEW */}
       {showGraphical && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Chart 1: Zone Incident Volume & Resolution Split */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-indigo-600" />
-                  Territory Workload: Resolved vs Open Incidents
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Volume breakdown of incoming service requests by territory zone
-                </p>
+        <div className="space-y-6">
+          
+          {/* Sub-view mode toggles for graphical tab */}
+          <div className="flex items-center justify-between gap-3 bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-600 pl-1">Visual Displays:</span>
+              <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setGraphicalSubMode('all')}
+                  className={`px-3 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                    graphicalSubMode === 'all'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Map className="w-3.5 h-3.5" />
+                  <span>Map & Charts</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGraphicalSubMode('map')}
+                  className={`px-3 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                    graphicalSubMode === 'map'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Map className="w-3.5 h-3.5" />
+                  <span>India Map Only</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGraphicalSubMode('charts')}
+                  className={`px-3 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                    graphicalSubMode === 'charts'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span>Charts Only</span>
+                </button>
               </div>
             </div>
 
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                    formatter={(val: any, name: string) => [val, name === 'Resolved' ? 'Closed Incidents' : 'Open Incidents']}
-                  />
-                  <Legend verticalAlign="top" height={36} iconType="circle" />
-                  <Bar dataKey="Resolved" fill="#4f46e5" stackId="a" radius={[0, 0, 4, 4]} />
-                  <Bar dataKey="Open" fill="#f59e0b" stackId="a" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {selectedZone && (
+              <button
+                type="button"
+                onClick={() => setSelectedZone(null)}
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer pr-1"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Clear Zone Filter</span>
+              </button>
+            )}
           </div>
 
-          {/* Chart 2: Regional Response Speed & SLA Comparison */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-emerald-600" />
-                  Regional Response Time (Minutes) & SLA %
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Arrival speed on site from initial WhatsApp alert dispatch
-                </p>
+          {/* Interactive India Territory Map */}
+          {(graphicalSubMode === 'all' || graphicalSubMode === 'map') && (
+            <IndiaZoneMap
+              zoneMetrics={zoneMetrics}
+              incidents={incidents}
+              selectedZone={selectedZone}
+              onSelectZone={(zone) => setSelectedZone(zone)}
+              onOpenAuditModal={(zone) => setAuditModalZone(zone)}
+            />
+          )}
+
+          {/* Workload & Resolution Comparison Charts */}
+          {(graphicalSubMode === 'all' || graphicalSubMode === 'charts') && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Chart 1: Zone Incident Volume & Resolution Split */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-indigo-600" />
+                      Territory Workload: Resolved vs Open Incidents
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Volume breakdown of incoming service requests by territory zone
+                    </p>
+                  </div>
+                </div>
+
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                        formatter={(val: any, name: string) => [val, name === 'Resolved' ? 'Closed Incidents' : 'Open Incidents']}
+                      />
+                      <Legend verticalAlign="top" height={36} iconType="circle" />
+                      <Bar dataKey="Resolved" fill="#4f46e5" stackId="a" radius={[0, 0, 4, 4]} />
+                      <Bar dataKey="Open" fill="#f59e0b" stackId="a" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Chart 2: Regional Response Speed & SLA Comparison */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-emerald-600" />
+                      Regional Response Time (Minutes) & SLA %
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Arrival speed on site from initial WhatsApp alert dispatch
+                    </p>
+                  </div>
+                </div>
+
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#64748b' }} unit="m" />
+                      <YAxis yAxisId="right" orientation="right" domain={[80, 100]} tick={{ fontSize: 11, fill: '#64748b' }} unit="%" />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                      />
+                      <Legend verticalAlign="top" height={36} iconType="circle" />
+                      <Bar yAxisId="left" dataKey="ResponseMins" name="Avg Response Time (Min)" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                      <Bar yAxisId="right" dataKey="SLA" name="SLA Adherence (%)" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
-
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#64748b' }} unit="m" />
-                  <YAxis yAxisId="right" orientation="right" domain={[80, 100]} tick={{ fontSize: 11, fill: '#64748b' }} unit="%" />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                  />
-                  <Legend verticalAlign="top" height={36} iconType="circle" />
-                  <Bar yAxisId="left" dataKey="ResponseMins" name="Avg Response Time (Min)" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-                  <Bar yAxisId="right" dataKey="SLA" name="SLA Adherence (%)" fill="#10b981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -213,10 +323,24 @@ export const ZoneAnalytics: React.FC<ZoneAnalyticsProps> = ({
         <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <TableIcon className="w-4 h-4 text-indigo-600" />
-                Territory Zone Master Registry Table
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <TableIcon className="w-4 h-4 text-indigo-600" />
+                  Territory Zone Master Registry Table
+                </h3>
+                {selectedZone && (
+                  <span className="text-[11px] font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-200 flex items-center gap-1">
+                    Filtered: {selectedZone.zone}
+                    <button 
+                      type="button" 
+                      onClick={() => setSelectedZone(null)}
+                      className="hover:text-indigo-950 font-bold ml-0.5 cursor-pointer"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 Complete quantitative metrics by operational region and territory leads
               </p>
@@ -254,11 +378,24 @@ export const ZoneAnalytics: React.FC<ZoneAnalyticsProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredZones.map((z) => (
-                  <tr key={z.zone} className="hover:bg-slate-50/80 transition-colors">
+                  <tr 
+                    key={z.zone} 
+                    className={`transition-colors cursor-pointer ${
+                      selectedZone?.zone === z.zone 
+                        ? 'bg-indigo-50/40 hover:bg-indigo-50/60' 
+                        : 'hover:bg-slate-50/80'
+                    }`}
+                    onClick={() => setSelectedZone(selectedZone?.zone === z.zone ? null : z)}
+                  >
                     <td className="py-3 px-3">
                       <div className="font-bold text-slate-900 flex items-center gap-2">
                         <MapPin className="w-3.5 h-3.5 text-indigo-600" />
                         {z.zone}
+                        {selectedZone?.zone === z.zone && (
+                          <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-100/70 px-1.5 py-0.2 rounded">
+                            Active
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="py-3 px-3 text-center">
@@ -299,9 +436,10 @@ export const ZoneAnalytics: React.FC<ZoneAnalyticsProps> = ({
                     <td className="py-3 px-3 font-semibold text-slate-800">
                       {z.leadEngineer}
                     </td>
-                    <td className="py-3 px-3 text-right">
+                    <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => setSelectedZone(z)}
+                        type="button"
+                        onClick={() => setAuditModalZone(z)}
                         className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                       >
                         Details
@@ -316,17 +454,18 @@ export const ZoneAnalytics: React.FC<ZoneAnalyticsProps> = ({
       )}
 
       {/* Zone Detail Modal */}
-      {selectedZone && (
+      {auditModalZone && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl space-y-4 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <div className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Territory Audit</div>
-                <h3 className="text-lg font-bold text-slate-900">{selectedZone.zone} Performance</h3>
+                <h3 className="text-lg font-bold text-slate-900">{auditModalZone.zone} Performance</h3>
               </div>
               <button
-                onClick={() => setSelectedZone(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                type="button"
+                onClick={() => setAuditModalZone(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
                 &times;
               </button>
@@ -335,26 +474,37 @@ export const ZoneAnalytics: React.FC<ZoneAnalyticsProps> = ({
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="text-[11px] text-slate-500">Lead Field Engineer</div>
-                <div className="font-bold text-slate-900 text-sm mt-0.5">{selectedZone.leadEngineer}</div>
+                <div className="font-bold text-slate-900 text-sm mt-0.5">{auditModalZone.leadEngineer}</div>
               </div>
               <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
                 <div className="text-[11px] text-emerald-700">SLA Adherence</div>
-                <div className="font-bold text-emerald-800 text-sm mt-0.5">{selectedZone.slaPercentage}% Pass Rate</div>
+                <div className="font-bold text-emerald-800 text-sm mt-0.5">{auditModalZone.slaPercentage}% Pass Rate</div>
               </div>
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="text-[11px] text-slate-500">Average On-Site Reach</div>
-                <div className="font-bold text-slate-900 text-sm mt-0.5">{selectedZone.avgResponseMinutes} minutes</div>
+                <div className="font-bold text-slate-900 text-sm mt-0.5">{auditModalZone.avgResponseMinutes} minutes</div>
               </div>
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="text-[11px] text-slate-500">Primary Breakdown Issue</div>
-                <div className="font-bold text-slate-900 text-sm mt-0.5">{selectedZone.topProblem}</div>
+                <div className="font-bold text-slate-900 text-sm mt-0.5">{auditModalZone.topProblem}</div>
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-100 flex justify-end">
+            <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
               <button
-                onClick={() => setSelectedZone(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-xl text-xs"
+                type="button"
+                onClick={() => {
+                  setSelectedZone(auditModalZone);
+                  setAuditModalZone(null);
+                }}
+                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Filter to this Zone
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuditModalZone(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-xl text-xs cursor-pointer"
               >
                 Close View
               </button>
