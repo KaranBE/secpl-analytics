@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Building2, 
   Search, 
@@ -9,16 +9,19 @@ import {
   Wrench, 
   ChevronRight, 
   FileText, 
-  SlidersHorizontal,
-  CheckCircle2,
-  Layers,
-  BarChart3,
-  Table as TableIcon,
-  Download,
-  Flame,
-  Tag
+  SlidersHorizontal, 
+  CheckCircle2, 
+  Layers, 
+  BarChart3, 
+  Table as TableIcon, 
+  Download, 
+  Flame, 
+  Tag, 
+  Zap 
 } from 'lucide-react';
 import { CustomerMetric, CompressorRecord, ViewMode } from '../../types';
+import { useVirtualScroll } from '../../utils/useVirtualScroll';
+import { PaginationControls, PageSizeMode } from '../common/PaginationControls';
 import { 
   BarChart, 
   Bar, 
@@ -57,21 +60,47 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
   const [selectedContract, setSelectedContract] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'total' | 'open' | 'critical' | 'name'>('total');
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerMetric | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSizeMode>(25);
 
   // Filter and sort customer metrics
-  const filteredMetrics = customerMetrics.filter(c => {
-    const matchSearch = c.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      c.area.toLowerCase().includes(search.toLowerCase()) ||
-      c.activeModels.some(m => m.toLowerCase().includes(search.toLowerCase())) ||
-      c.serialNumbers.some(s => s.toLowerCase().includes(search.toLowerCase()));
-    
-    const matchContract = selectedContract === 'All' || c.contract === selectedContract;
-    return matchSearch && matchContract;
-  }).sort((a, b) => {
-    if (sortBy === 'total') return b.totalCalls - a.totalCalls;
-    if (sortBy === 'open') return b.openCalls - a.openCalls;
-    if (sortBy === 'closed') return b.closedCalls - a.closedCalls;
-    return a.customerName.localeCompare(b.customerName);
+  const filteredMetrics = useMemo(() => {
+    return customerMetrics.filter(c => {
+      const matchSearch = c.customerName.toLowerCase().includes(search.toLowerCase()) ||
+        c.area.toLowerCase().includes(search.toLowerCase()) ||
+        c.activeModels.some(m => m.toLowerCase().includes(search.toLowerCase())) ||
+        c.serialNumbers.some(s => s.toLowerCase().includes(search.toLowerCase()));
+      
+      const matchContract = selectedContract === 'All' || c.contract === selectedContract;
+      return matchSearch && matchContract;
+    }).sort((a, b) => {
+      if (sortBy === 'total') return b.totalCalls - a.totalCalls;
+      if (sortBy === 'open') return b.openCalls - a.openCalls;
+      if (sortBy === 'closed') return b.closedCalls - a.closedCalls;
+      return a.customerName.localeCompare(b.customerName);
+    });
+  }, [customerMetrics, search, selectedContract, sortBy]);
+
+  const totalItems = filteredMetrics.length;
+  const numericPageSize = typeof pageSize === 'number' ? pageSize : 25;
+  const totalPages = Math.max(1, Math.ceil(totalItems / numericPageSize));
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(1);
+    }
+  }, [totalPages, page]);
+
+  const paginatedMetrics = useMemo(() => {
+    if (pageSize === 'virtual') return filteredMetrics;
+    const start = (page - 1) * pageSize;
+    return filteredMetrics.slice(start, start + pageSize);
+  }, [filteredMetrics, page, pageSize]);
+
+  const virtualScroll = useVirtualScroll({
+    totalItems: filteredMetrics.length,
+    itemHeight: 56,
+    overscan: 5
   });
 
   // Top 8 customer volume chart data
@@ -109,21 +138,6 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
 
   const showGraphical = viewMode === 'both' || viewMode === 'graphical';
   const showTabular = viewMode === 'both' || viewMode === 'tabular';
-
-  const exportCSV = () => {
-    const headers = ['Customer Name,Area,Contract,Total Calls,Open Calls,Closed Calls,Active Models,Serial Numbers,Primary Engineer'];
-    const rows = filteredMetrics.map(c => 
-      `"${c.customerName}","${c.area}","${c.contract}",${c.totalCalls},${c.openCalls},${c.closedCalls},"${c.activeModels.join('; ')}","${c.serialNumbers.join('; ')}","${c.primaryEngineer}"`
-    );
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `compressor_customer_analytics_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   return (
     <div className="space-y-6">
@@ -318,7 +332,10 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
                 <input
                   type="text"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
                   placeholder="Filter customer, model, serial..."
                   className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 w-52 sm:w-64"
                 />
@@ -327,7 +344,10 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
               {/* Filter by Contract */}
               <select
                 value={selectedContract}
-                onChange={(e) => setSelectedContract(e.target.value)}
+                onChange={(e) => {
+                  setSelectedContract(e.target.value);
+                  setPage(1);
+                }}
                 className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer"
               >
                 <option value="All">All Contracts</option>
@@ -341,7 +361,10 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
               {/* Sort selector */}
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => {
+                  setSortBy(e.target.value as any);
+                  setPage(1);
+                }}
                 className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer"
               >
                 <option value="total">Sort: Total Calls (High to Low)</option>
@@ -352,95 +375,224 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
             </div>
           </div>
 
-          {/* Table Container */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-500 font-semibold bg-slate-50/70">
-                  <th className="py-3 px-3">Customer Account</th>
-                  <th className="py-3 px-3">Area / Zone</th>
-                  <th className="py-3 px-3">Contract Type</th>
-                  <th className="py-3 px-3">Active Models & Serials</th>
-                  <th className="py-3 px-3 text-center">Total Calls</th>
-                  <th className="py-3 px-3 text-center">Open</th>
-                  <th className="py-3 px-3">Top Problems Reported</th>
-                  <th className="py-3 px-3">Assigned Lead</th>
-                  <th className="py-3 px-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredMetrics.map((cust) => (
-                  <tr key={cust.customerName} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-3">
-                      <div className="font-bold text-slate-900">{cust.customerName}</div>
-                      <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                        <Tag className="w-3 h-3 text-slate-400" />
-                        {cust.serialNumbers.length} registered asset{cust.serialNumbers.length > 1 ? 's' : ''}
-                      </div>
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
-                        {cust.area}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        cust.contract === 'Comprehensive AMC'
-                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                          : cust.contract === 'Warranty'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-slate-100 text-slate-700 border border-slate-200'
-                      }`}>
-                        {cust.contract}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 max-w-xs">
-                      <div className="font-medium text-slate-800 truncate" title={cust.activeModels.join(', ')}>
-                        {cust.activeModels.join(', ')}
-                      </div>
-                      <div className="font-mono text-[10px] text-slate-500 truncate" title={cust.serialNumbers.join(', ')}>
-                        SN: {cust.serialNumbers.join(', ')}
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
-                        {cust.totalCalls}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      {cust.openCalls > 0 ? (
-                        <span className="font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                          {cust.openCalls}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 font-medium">0</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-3 max-w-xs">
-                      <div className="flex flex-wrap gap-1">
-                        {cust.topProblems.slice(0, 2).map(p => (
-                          <span key={p.problem} className="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px]">
-                            {p.problem} ({p.count})
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-slate-700 font-medium">
-                      {cust.primaryEngineer}
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <button
-                        onClick={() => setSelectedCustomer(cust)}
-                        className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                      >
-                        Details
-                      </button>
-                    </td>
+          {/* Table Container - Virtual Windowed or Standard Paginated */}
+          {filteredMetrics.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+              No customer accounts found matching your query.
+            </div>
+          ) : pageSize === 'virtual' ? (
+            <div 
+              ref={virtualScroll.containerRef} 
+              className="overflow-x-auto max-h-[580px] overflow-y-auto border border-slate-200/90 rounded-xl shadow-inner scrollbar-thin"
+            >
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 shadow-xs">
+                  <tr className="text-slate-600 font-semibold">
+                    <th className="py-3 px-3 bg-slate-50">Customer Account</th>
+                    <th className="py-3 px-3 bg-slate-50">Area / Zone</th>
+                    <th className="py-3 px-3 bg-slate-50">Contract Type</th>
+                    <th className="py-3 px-3 bg-slate-50">Active Models & Serials</th>
+                    <th className="py-3 px-3 text-center bg-slate-50">Total Calls</th>
+                    <th className="py-3 px-3 text-center bg-slate-50">Open</th>
+                    <th className="py-3 px-3 bg-slate-50">Top Problems Reported</th>
+                    <th className="py-3 px-3 bg-slate-50">Assigned Lead</th>
+                    <th className="py-3 px-3 text-right bg-slate-50">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {virtualScroll.topPadding > 0 && (
+                    <tr style={{ height: `${virtualScroll.topPadding}px` }}>
+                      <td colSpan={9} className="p-0 border-0" />
+                    </tr>
+                  )}
+                  {virtualScroll.virtualItems.map(({ index }) => {
+                    const cust = filteredMetrics[index];
+                    if (!cust) return null;
+                    return (
+                      <tr key={cust.customerName} className="hover:bg-slate-50/80 transition-colors h-[56px]">
+                        <td className="py-2.5 px-3">
+                          <div className="font-bold text-slate-900">{cust.customerName}</div>
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Tag className="w-3 h-3 text-slate-400" />
+                            {cust.serialNumbers.length} registered asset{cust.serialNumbers.length > 1 ? 's' : ''}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
+                            {cust.area}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            cust.contract === 'Comprehensive AMC'
+                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                              : cust.contract === 'Warranty'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}>
+                            {cust.contract}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 max-w-xs">
+                          <div className="font-medium text-slate-800 truncate" title={cust.activeModels.join(', ')}>
+                            {cust.activeModels.join(', ')}
+                          </div>
+                          <div className="font-mono text-[10px] text-slate-500 truncate" title={cust.serialNumbers.join(', ')}>
+                            SN: {cust.serialNumbers.join(', ')}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                            {cust.totalCalls}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          {cust.openCalls > 0 ? (
+                            <span className="font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                              {cust.openCalls}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-medium">0</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 max-w-xs">
+                          <div className="flex flex-wrap gap-1">
+                            {cust.topProblems.slice(0, 2).map(p => (
+                              <span key={p.problem} className="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px]">
+                                {p.problem} ({p.count})
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700 font-medium whitespace-nowrap">
+                          {cust.primaryEngineer}
+                        </td>
+                        <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => setSelectedCustomer(cust)}
+                            className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                          >
+                            Details
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {virtualScroll.bottomPadding > 0 && (
+                    <tr style={{ height: `${virtualScroll.bottomPadding}px` }}>
+                      <td colSpan={9} className="p-0 border-0" />
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-slate-200/90 rounded-xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-50/70 border-b border-slate-200">
+                  <tr className="text-slate-500 font-semibold">
+                    <th className="py-3 px-3">Customer Account</th>
+                    <th className="py-3 px-3">Area / Zone</th>
+                    <th className="py-3 px-3">Contract Type</th>
+                    <th className="py-3 px-3">Active Models & Serials</th>
+                    <th className="py-3 px-3 text-center">Total Calls</th>
+                    <th className="py-3 px-3 text-center">Open</th>
+                    <th className="py-3 px-3">Top Problems Reported</th>
+                    <th className="py-3 px-3">Assigned Lead</th>
+                    <th className="py-3 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginatedMetrics.map((cust) => (
+                    <tr key={cust.customerName} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="font-bold text-slate-900">{cust.customerName}</div>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                          <Tag className="w-3 h-3 text-slate-400" />
+                          {cust.serialNumbers.length} registered asset{cust.serialNumbers.length > 1 ? 's' : ''}
+                        </div>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
+                          {cust.area}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          cust.contract === 'Comprehensive AMC'
+                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                            : cust.contract === 'Warranty'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}>
+                          {cust.contract}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 max-w-xs">
+                        <div className="font-medium text-slate-800 truncate" title={cust.activeModels.join(', ')}>
+                          {cust.activeModels.join(', ')}
+                        </div>
+                        <div className="font-mono text-[10px] text-slate-500 truncate" title={cust.serialNumbers.join(', ')}>
+                          SN: {cust.serialNumbers.join(', ')}
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                          {cust.totalCalls}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        {cust.openCalls > 0 ? (
+                          <span className="font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                            {cust.openCalls}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-medium">0</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 max-w-xs">
+                        <div className="flex flex-wrap gap-1">
+                          {cust.topProblems.slice(0, 2).map(p => (
+                            <span key={p.problem} className="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px]">
+                              {p.problem} ({p.count})
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-slate-700 font-medium">
+                        {cust.primaryEngineer}
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <button
+                          onClick={() => setSelectedCustomer(cust)}
+                          className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination & Virtual Mode Controls */}
+          <PaginationControls
+            currentPage={page}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            startIndex={(page - 1) * numericPageSize}
+            endIndex={pageSize === 'virtual' ? totalItems : Math.min(page * numericPageSize, totalItems)}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => {
+              setPageSize(s);
+              setPage(1);
+            }}
+            itemLabel="customer accounts"
+            virtualVisibleCount={virtualScroll.visibleCount}
+          />
         </div>
       )}
 

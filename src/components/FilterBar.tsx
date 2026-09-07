@@ -16,6 +16,7 @@ import {
   Filter
 } from 'lucide-react';
 import { DashboardFilters, DatePreset, EquipmentType, ViewMode } from '../types';
+import { cleanEngineerName } from '../utils/cleanUtils';
 
 interface FilterBarProps {
   filters: DashboardFilters;
@@ -147,7 +148,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   const engineerDisplayText = 
     filters.engineers.length === 0 || isAllEngineersSelected
       ? 'All'
-      : filters.engineers.join(', ');
+      : filters.engineers.map(cleanEngineerName).join(', ');
 
   const isFiltered = 
     filters.datePreset !== 'all' || 
@@ -461,7 +462,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       }`}>
                         {isChecked && <Check className="w-3 h-3" />}
                       </div>
-                      <span className="font-medium">{eng}</span>
+                      <span className="font-medium">{cleanEngineerName(eng)}</span>
                     </label>
                   );
                 })}
@@ -547,7 +548,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           ) : (
             filters.engineers.map((e) => (
               <span key={e} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-medium">
-                Eng: {e}
+                Eng: {cleanEngineerName(e)}
                 <button onClick={() => handleToggleEngineer(e)} className="hover:text-slate-900 cursor-pointer">
                   <X className="w-3 h-3" />
                 </button>

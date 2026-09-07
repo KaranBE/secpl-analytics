@@ -1,5 +1,6 @@
 import { CompressorRecord, DispenserSheetRecord, TicketStatus } from '../types';
 import { normalizeDateToISO } from '../utils/dateUtils';
+import { cleanEngineerName } from '../utils/cleanUtils';
 
 export const COMPRESSOR_SPREADSHEET_ID = '1BdifU1B_GzUgs5dkcadQMZhMuOcveG_41m7OSsQr0MU';
 export const DISPENSER_SPREADSHEET_ID = '16rYwtl9mx_kWun3q-CqvBx57o5bcovAGvlQSjYarIMU';
@@ -205,7 +206,7 @@ export async function fetchLiveCompressorRecords(
       serialNumber: (serialIdx >= 0 ? row[serialIdx] : '')?.trim() || `SN-CMP-${r}`,
       problem: compProblem,
       contract,
-      supportEngineer: (engIdx >= 0 ? row[engIdx] : '')?.trim() || 'Unassigned',
+      supportEngineer: cleanEngineerName(engIdx >= 0 ? row[engIdx] : '') || 'Unassigned',
       whatsappMessageId: (wamidIdx >= 0 ? row[wamidIdx] : '')?.trim() || `wamid.GS_${r}`,
       senderNumber: (senderIdx >= 0 ? row[senderIdx] : '')?.trim() || '+91 98000 00000',
       status,
@@ -357,7 +358,7 @@ export async function fetchLiveDispenserRecords(
       reachTime: (reachTimeIdx >= 0 ? row[reachTimeIdx] : '')?.trim() || '09:40 AM',
       closeTime: rawCloseTime || (status === 'Closed' ? '11:30 AM' : '-'),
       zoneName: (zoneIdx >= 0 ? row[zoneIdx] : '')?.trim() || 'North Zone',
-      serviceEngineerName: (engIdx >= 0 ? row[engIdx] : '')?.trim() || 'Service Lead',
+      serviceEngineerName: cleanEngineerName(engIdx >= 0 ? row[engIdx] : '') || 'Service Lead',
       problem: problemVal,
       whatsappMessageId: (wamidIdx >= 0 ? row[wamidIdx] : '')?.trim() || `wamid.DSP_GS_${r}`,
       senderNumber: (senderIdx >= 0 ? row[senderIdx] : '')?.trim() || '+91 98000 00000',

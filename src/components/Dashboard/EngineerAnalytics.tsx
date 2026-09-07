@@ -11,7 +11,6 @@ import {
   Phone, 
   BarChart3, 
   Table as TableIcon,
-  Download,
   Search,
   ShieldCheck,
   Zap,
@@ -175,22 +174,6 @@ export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
   const showGraphical = viewMode === 'both' || viewMode === 'graphical';
   const showTabular = viewMode === 'both' || viewMode === 'tabular';
 
-  // Export CSV functionality
-  const exportCSV = () => {
-    const headers = ['Engineer Name,Primary Zone,Phone,Total Assigned,Closed Incidents,Open Incidents,Compressor Calls,Dispenser Calls,Avg Response (Mins),Avg MTTR (Hours),SLA Adherence (%),CSAT Rating'];
-    const rows = processedEngineers.map(eng => 
-      `"${eng.name}","${eng.zone}","${eng.phone}",${eng.totalAssigned},${eng.totalClosed},${eng.openTickets},${eng.compressorCalls},${eng.dispenserCalls},${eng.avgResponseMinutes},${eng.avgResolutionHours},${eng.slaAdherenceRate}%,${eng.rating}`
-    );
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `engineer_workforce_analysis_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   return (
     <div className="space-y-6">
       {/* Header Banner */}
@@ -208,13 +191,6 @@ export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={exportCSV}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors shadow-2xs cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV</span>
-          </button>
           <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
             {engineerMetrics.length} Active Technicians
           </span>

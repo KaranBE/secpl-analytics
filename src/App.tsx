@@ -30,6 +30,7 @@ import {
   DISPENSER_SPREADSHEET_ID
 } from './services/googleSheets';
 import { normalizeDateToISO } from './utils/dateUtils';
+import { cleanEngineerName } from './utils/cleanUtils';
 import { Header } from './components/Header';
 import { Sidebar, DashboardNavTab } from './components/Sidebar';
 import { FilterBar } from './components/FilterBar';
@@ -38,6 +39,7 @@ import { OverviewDashboard } from './components/Dashboard/OverviewDashboard';
 import { ZoneAnalytics } from './components/Dashboard/ZoneAnalytics';
 import { EngineerAnalytics } from './components/Dashboard/EngineerAnalytics';
 import { CustomerAnalytics } from './components/Dashboard/CustomerAnalytics';
+import { LoginModal } from './components/LoginModal';
 
 export default function App() {
   // Navigation & UI States
@@ -49,6 +51,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(false);
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(true);
   const [isSyncingSheets, setIsSyncingSheets] = useState<boolean>(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -126,6 +129,7 @@ export default function App() {
       async (authUser, token) => {
         setUser(authUser);
         setIsAuthenticated(true);
+        setShowLoginModal(false);
         if (token) {
           await syncLiveSheets(token);
         }
@@ -149,6 +153,7 @@ export default function App() {
       if (res) {
         setUser(res.user);
         setIsAuthenticated(true);
+        setShowLoginModal(false);
         await syncLiveSheets(res.accessToken);
       }
     } catch (err: any) {
@@ -175,6 +180,7 @@ export default function App() {
     await googleSignOut();
     setUser(null);
     setIsAuthenticated(false);
+    setShowLoginModal(true);
     setLastSyncedAt(null);
     setSyncError(null);
     setCompressorData(COMPRESSOR_RECORDS);
@@ -201,8 +207,14 @@ export default function App() {
 
   const availableEngineers = useMemo(() => {
     const engineers = new Set<string>();
-    compressorData.forEach(c => engineers.add(c.supportEngineer));
-    dispenserData.forEach(d => engineers.add(d.serviceEngineerName));
+    compressorData.forEach(c => {
+      const clean = cleanEngineerName(c.supportEngineer);
+      if (clean) engineers.add(clean);
+    });
+    dispenserData.forEach(d => {
+      const clean = cleanEngineerName(d.serviceEngineerName);
+      if (clean) engineers.add(clean);
+    });
     return Array.from(engineers).sort();
   }, [compressorData, dispenserData]);
 
@@ -265,7 +277,7 @@ export default function App() {
 
       // 4. Multi-Select Engineer filter
       const isAllEngineers = filters.engineers.length === 0 || (availableEngineers.length > 0 && filters.engineers.length >= availableEngineers.length);
-      if (!isAllEngineers && !filters.engineers.includes(inc.engineer)) {
+      if (!isAllEngineers && !filters.engineers.includes(cleanEngineerName(inc.engineer))) {
         return false;
       }
 
@@ -302,7 +314,7 @@ export default function App() {
       if (!matchesDate(c.date)) return false;
       if (filters.equipmentType === 'Dispenser') return false;
       if (!isAllZones && !filters.zones.includes(c.area)) return false;
-      if (!isAllEngineers && !filters.engineers.includes(c.supportEngineer)) return false;
+      if (!isAllEngineers && !filters.engineers.includes(cleanEngineerName(c.supportEngineer))) return false;
       if (filters.status !== 'All' && c.status !== filters.status) return false;
       
       const activeSearch = (searchQuery || filters.searchQuery).trim().toLowerCase();
@@ -330,7 +342,7 @@ export default function App() {
       if (!matchesDate(d.date)) return false;
       if (filters.equipmentType === 'Compressor') return false;
       if (!isAllZones && !filters.zones.includes(d.zoneName)) return false;
-      if (!isAllEngineers && !filters.engineers.includes(d.serviceEngineerName)) return false;
+      if (!isAllEngineers && !filters.engineers.includes(cleanEngineerName(d.serviceEngineerName))) return false;
       if (filters.status !== 'All' && d.status !== filters.status) return false;
 
       const activeSearch = (searchQuery || filters.searchQuery).trim().toLowerCase();
@@ -381,136 +393,149 @@ export default function App() {
   const openTicketsCount = filteredUnifiedIncidents.filter(i => i.status !== 'Closed').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-indigo-500 selection:text-white">
-      {/* Top Header */}
-      <Header
-        isMobileMenuOpen={isMobileMenuOpen}
-        onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        user={user}
-        isLiveSynced={isAuthenticated && !!lastSyncedAt}
-      />
+    <div className="relative min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-indigo-500 selection:text-white">
+      {/* Background Screen: Blurred when login modal is active */}
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${showLoginModal ? 'filter blur-[4px] pointer-events-none select-none opacity-85' : ''}`}>
+        {/* Top Header */}
+        <Header
+          isMobileMenuOpen={isMobileMenuOpen}
+          onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          user={user}
+          isLiveSynced={isAuthenticated && !!lastSyncedAt}
+          onOpenLogin={() => setShowLoginModal(true)}
+        />
 
-      {/* Google Sheets Live Sync Bar */}
-      <GoogleSheetsSyncBar
-        user={user}
-        isAuthenticated={isAuthenticated}
-        isLoading={isLoadingAuth}
-        isSyncing={isSyncingSheets}
-        syncError={syncError}
-        lastSyncedAt={lastSyncedAt}
-        compressorRowCount={compressorData.length}
-        dispenserRowCount={dispenserData.length}
-        compressorSheetTitle={compressorSheetTitle}
-        dispenserSheetTitle={dispenserSheetTitle}
-        onSignIn={handleSignIn}
-        onSignOut={handleSignOut}
-        onSync={handleManualSync}
-      />
+        {/* Google Sheets Live Sync Bar */}
+        <GoogleSheetsSyncBar
+          user={user}
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoadingAuth}
+          isSyncing={isSyncingSheets}
+          syncError={syncError}
+          lastSyncedAt={lastSyncedAt}
+          compressorRowCount={compressorData.length}
+          dispenserRowCount={dispenserData.length}
+          compressorSheetTitle={compressorSheetTitle}
+          dispenserSheetTitle={dispenserSheetTitle}
+          onSignIn={() => setShowLoginModal(true)}
+          onSignOut={handleSignOut}
+          onSync={handleManualSync}
+        />
 
-      {/* Main Container with Sidebar Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Desktop Sidebar */}
-        <div className="hidden lg:block">
-          <Sidebar
-            activeTab={activeTab}
-            onSelectTab={setActiveTab}
-            openTicketsCount={openTicketsCount}
-            totalComplaintsCount={allUnifiedIncidents.length}
-            compressorCount={compressorData.length}
-            dispenserCount={dispenserData.length}
-            engineerCount={engineerMetrics.length}
-            isLiveConnected={isAuthenticated && !!lastSyncedAt}
-          />
+        {/* Main Container with Sidebar Layout */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Desktop Sidebar */}
+          <div className="hidden lg:block">
+            <Sidebar
+              activeTab={activeTab}
+              onSelectTab={setActiveTab}
+              openTicketsCount={openTicketsCount}
+              totalComplaintsCount={allUnifiedIncidents.length}
+              compressorCount={compressorData.length}
+              dispenserCount={dispenserData.length}
+              engineerCount={engineerMetrics.length}
+              isLiveConnected={isAuthenticated && !!lastSyncedAt}
+            />
+          </div>
+
+          {/* Mobile Sidebar Overlay Drawer */}
+          {isMobileMenuOpen && (
+            <div className="fixed inset-0 z-40 lg:hidden flex">
+              <div 
+                className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+                onClick={() => setIsMobileMenuOpen(false)}
+              />
+              <div className="relative w-72 max-w-xs bg-white h-full z-50 shadow-2xl flex flex-col">
+                <Sidebar
+                  activeTab={activeTab}
+                  onSelectTab={setActiveTab}
+                  openTicketsCount={openTicketsCount}
+                  totalComplaintsCount={allUnifiedIncidents.length}
+                  compressorCount={compressorData.length}
+                  dispenserCount={dispenserData.length}
+                  engineerCount={engineerMetrics.length}
+                  onCloseMobile={() => setIsMobileMenuOpen(false)}
+                  isLiveConnected={isAuthenticated && !!lastSyncedAt}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Main Content Area */}
+          <main className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6 max-w-7xl mx-auto w-full">
+            {/* Universal Interactive Filter Bar */}
+            <FilterBar
+              filters={filters}
+              onFilterChange={setFilters}
+              onResetFilters={handleResetFilters}
+              filteredCount={filteredUnifiedIncidents.length}
+              totalCount={allUnifiedIncidents.length}
+              availableZones={availableZones}
+              availableEngineers={availableEngineers}
+            />
+
+            {/* Module Views */}
+            {activeTab === 'overview' && (
+              <OverviewDashboard
+                incidents={filteredUnifiedIncidents}
+                compressors={filteredCompressorRecords}
+                dispensers={filteredDispenserRecords}
+                zoneMetrics={zoneMetrics}
+                engineerMetrics={engineerMetrics}
+                customerMetrics={customerMetrics}
+                viewMode={filters.viewMode}
+                onNavigateToTab={(tab) => setActiveTab(tab)}
+              />
+            )}
+
+            {activeTab === 'zones' && (
+              <ZoneAnalytics
+                zoneMetrics={zoneMetrics}
+                incidents={filteredUnifiedIncidents}
+                viewMode={filters.viewMode}
+              />
+            )}
+
+            {activeTab === 'engineers' && (
+              <EngineerAnalytics
+                engineerMetrics={engineerMetrics}
+                incidents={filteredUnifiedIncidents}
+                viewMode={filters.viewMode}
+              />
+            )}
+
+            {activeTab === 'customers' && (
+              <CustomerAnalytics
+                customerMetrics={customerMetrics}
+                compressors={filteredCompressorRecords}
+                viewMode={filters.viewMode}
+              />
+            )}
+          </main>
         </div>
 
-        {/* Mobile Sidebar Overlay Drawer */}
-        {isMobileMenuOpen && (
-          <div className="fixed inset-0 z-40 lg:hidden flex">
-            <div 
-              className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
-              onClick={() => setIsMobileMenuOpen(false)}
-            />
-            <div className="relative w-72 max-w-xs bg-white h-full z-50 shadow-2xl flex flex-col">
-              <Sidebar
-                activeTab={activeTab}
-                onSelectTab={setActiveTab}
-                openTicketsCount={openTicketsCount}
-                totalComplaintsCount={allUnifiedIncidents.length}
-                compressorCount={compressorData.length}
-                dispenserCount={dispenserData.length}
-                engineerCount={engineerMetrics.length}
-                onCloseMobile={() => setIsMobileMenuOpen(false)}
-                isLiveConnected={isAuthenticated && !!lastSyncedAt}
-              />
+        {/* Footer */}
+        <footer className="border-t border-slate-200/90 bg-white py-3 px-6 text-xs text-slate-500">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-7xl mx-auto">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span className="font-semibold text-slate-700">Service Operations Analytics Engine</span>
+            </div>
+            <div className="text-slate-400 text-[11px] font-mono">
+              Sheet 1 (Compressor) & Sheet 2 (Dispenser) Live Sync &bull; 94.2% Fleet SLA
             </div>
           </div>
-        )}
-
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6 max-w-7xl mx-auto w-full">
-          {/* Universal Interactive Filter Bar */}
-          <FilterBar
-            filters={filters}
-            onFilterChange={setFilters}
-            onResetFilters={handleResetFilters}
-            filteredCount={filteredUnifiedIncidents.length}
-            totalCount={allUnifiedIncidents.length}
-            availableZones={availableZones}
-            availableEngineers={availableEngineers}
-          />
-
-          {/* Module Views */}
-          {activeTab === 'overview' && (
-            <OverviewDashboard
-              incidents={filteredUnifiedIncidents}
-              compressors={filteredCompressorRecords}
-              dispensers={filteredDispenserRecords}
-              zoneMetrics={zoneMetrics}
-              engineerMetrics={engineerMetrics}
-              customerMetrics={customerMetrics}
-              viewMode={filters.viewMode}
-              onNavigateToTab={(tab) => setActiveTab(tab)}
-            />
-          )}
-
-          {activeTab === 'zones' && (
-            <ZoneAnalytics
-              zoneMetrics={zoneMetrics}
-              incidents={filteredUnifiedIncidents}
-              viewMode={filters.viewMode}
-            />
-          )}
-
-          {activeTab === 'engineers' && (
-            <EngineerAnalytics
-              engineerMetrics={engineerMetrics}
-              incidents={filteredUnifiedIncidents}
-              viewMode={filters.viewMode}
-            />
-          )}
-
-          {activeTab === 'customers' && (
-            <CustomerAnalytics
-              customerMetrics={customerMetrics}
-              compressors={filteredCompressorRecords}
-              viewMode={filters.viewMode}
-            />
-          )}
-        </main>
+        </footer>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200/90 bg-white py-3 px-6 text-xs text-slate-500">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-7xl mx-auto">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span className="font-semibold text-slate-700">Service Operations Analytics Engine</span>
-          </div>
-          <div className="text-slate-400 text-[11px] font-mono">
-            Sheet 1 (Compressor) & Sheet 2 (Dispenser) Live Sync &bull; 94.2% Fleet SLA
-          </div>
-        </div>
-      </footer>
+      {/* Centered Login Modal with Blurred Background Screen */}
+      <LoginModal
+        isOpen={showLoginModal}
+        isLoading={isLoadingAuth}
+        error={syncError}
+        onSignIn={handleSignIn}
+        onClose={() => setShowLoginModal(false)}
+      />
     </div>
   );
 }

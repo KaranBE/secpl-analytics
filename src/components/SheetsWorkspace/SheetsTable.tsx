@@ -9,7 +9,6 @@ import {
   Search, 
   Filter, 
   Plus, 
-  Download, 
   Copy, 
   Check, 
   Table2, 
@@ -78,38 +77,6 @@ export const SheetsTable: React.FC<SheetsTableProps> = ({
     }
   };
 
-  const handleExportCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,";
-    if (activeSheet === 'Complaints') {
-      csvContent += "Ticket ID,Timestamp,Customer,Phone,Zone,Location,Category,Dispenser ID,Engineer,Status,Resolution (Hrs),Notes\n";
-      complaints.forEach(c => {
-        csvContent += `"${c.ticketNumber}","${c.timestamp}","${c.customerName}","${c.customerPhone}","${c.zone}","${c.location}","${c.issueCategory}","${c.dispenserId}","${c.assignedEngineer}","${c.status}","${c.resolutionTimeHours || ''}","${c.notes.replace(/"/g, '""')}"\n`;
-      });
-    } else if (activeSheet === 'Dispensers') {
-      csvContent += "Dispenser Code,Model,Client Name,Zone,Location,Install Date,Last Service Date,Next Due Date,Filter Health %,UV Status,Status\n";
-      dispensers.forEach(d => {
-        csvContent += `"${d.dispenserCode}","${d.model}","${d.clientName}","${d.zone}","${d.floorLocation}","${d.installDate}","${d.lastServiceDate}","${d.nextDueDate}","${d.filterHealthPct}%","${d.uvLampStatus}","${d.status}"\n`;
-      });
-    } else if (activeSheet === 'Raw_Log') {
-      csvContent += "Log ID,Timestamp,Sender ID,Sender Name,Parsed Action,Status\n";
-      rawLogs.forEach(r => {
-        csvContent += `"${r.id}","${r.timestamp}","${r.senderWaId}","${r.senderName}","${r.parsedAction}","${r.status}"\n`;
-      });
-    } else {
-      csvContent += "Error ID,Timestamp,Sender WA ID,Reason,Status\n";
-      errors.forEach(e => {
-        csvContent += `"${e.id}","${e.timestamp}","${e.senderWaId}","${e.errorReason}","${e.status}"\n`;
-      });
-    }
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${activeSheet}_export.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.customerName) return;
@@ -165,13 +132,6 @@ export const SheetsTable: React.FC<SheetsTableProps> = ({
 
           {/* Quick Toolbar */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleExportCSV}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors shadow-xs"
-            >
-              <Download className="w-3.5 h-3.5 text-slate-500" />
-              <span>Export CSV</span>
-            </button>
             {activeSheet === 'Complaints' && (
               <button
                 onClick={() => setShowAddModal(true)}
@@ -612,11 +572,11 @@ export const SheetsTable: React.FC<SheetsTableProps> = ({
                     onChange={(e) => setFormData({ ...formData, assignedEngineer: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all font-medium"
                   >
-                    <option value="Amit Sharma">Amit Sharma (South)</option>
-                    <option value="Vishal Joshi">Vishal Joshi (West)</option>
-                    <option value="Rahul Verma">Rahul Verma (East)</option>
-                    <option value="Priya Nair">Priya Nair (North)</option>
-                    <option value="Vikram Rao">Vikram Rao (Central)</option>
+                    <option value="Amit Sharma">Amit Sharma</option>
+                    <option value="Vishal Joshi">Vishal Joshi</option>
+                    <option value="Rahul Verma">Rahul Verma</option>
+                    <option value="Priya Nair">Priya Nair</option>
+                    <option value="Vikram Rao">Vikram Rao</option>
                   </select>
                 </div>
               </div>

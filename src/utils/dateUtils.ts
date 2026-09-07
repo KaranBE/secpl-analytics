@@ -159,87 +159,265 @@ export function formatFullDisplayDate(isoDate: string): string {
   return isoDate;
 }
 
+export type TimelineGranularity = 'daily' | 'weekly' | 'monthly';
+export type TimelineRangePreset = 'all' | '7d' | '14d' | '30d' | '90d';
+
 export interface TimelineDataPoint {
-  dateKey: string;      // "2026-09-04"
+  dateKey: string;      // ISO date string e.g. "2026-09-04" or bucket key
   timestamp: number;    // numeric millisecond for true chronological sorting
-  displayDate: string;  // "04 Sep"
-  fullDate: string;     // "Thu, Sep 4, 2026"
+  displayDate: string;  // Short label for chart axes
+  fullDate: string;     // Full descriptive label with weekday
   compressor: number;   // count from Compressor Sheet
   dispenser: number;    // count from Dispenser Sheet
   total: number;        // compressor + dispenser
+  cumulativeCompressor: number;
+  cumulativeDispenser: number;
+  cumulativeTotal: number;
+  movingAverage: number;
+  topProblem?: string;
+  topProblemCount?: number;
+  topZone?: string;
+  topZoneCount?: number;
+  incidentsCount: number;
+  rawDateKeys: string[];
+}
+
+export interface BuildTimelineOptions {
+  granularity?: TimelineGranularity;
+  range?: TimelineRangePreset;
+}
+
+export function getMondayOfWeek(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  if (!y || !m || !d) return isoDate;
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const day = date.getUTCDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  date.setUTCDate(date.getUTCDate() + diff);
+  return date.toISOString().split('T')[0];
 }
 
 /**
- * Aggregates a list of unified incidents into a chronologically ordered daily timeline.
+ * Aggregates a list of unified incidents into a chronologically ordered timeline
+ * with configurable granularity, rolling moving averages, cumulative trajectories, and problem hotspots.
  */
 export function buildTimelineData(
-  incidents: Array<{ date: string; equipmentType: 'Compressor' | 'Dispenser' }>
+  incidents: Array<{ 
+    date: string; 
+    equipmentType: 'Compressor' | 'Dispenser';
+    problem?: string;
+    zoneOrArea?: string;
+    entityName?: string;
+  }>,
+  options: BuildTimelineOptions = {}
 ): {
   timeline: TimelineDataPoint[];
-  peakDay: { date: string; count: number; label: string } | null;
+  peakDay: { date: string; count: number; label: string; compressor: number; dispenser: number } | null;
   avgDaily: number;
   totalCompressor: number;
   totalDispenser: number;
   totalInflow: number;
+  velocityTrendPct: number;
+  dominantEquipment: 'Compressor' | 'Dispenser' | 'Balanced';
 } {
-  const map: Record<string, { compressor: number; dispenser: number }> = {};
+  const granularity = options.granularity || 'daily';
+  const range = options.range || 'all';
 
-  let totalCompressor = 0;
-  let totalDispenser = 0;
-
-  incidents.forEach(inc => {
-    const iso = normalizeDateToISO(inc.date);
-    if (!map[iso]) {
-      map[iso] = { compressor: 0, dispenser: 0 };
-    }
-    if (inc.equipmentType === 'Compressor') {
-      map[iso].compressor += 1;
-      totalCompressor += 1;
-    } else {
-      map[iso].dispenser += 1;
-      totalDispenser += 1;
-    }
-  });
-
-  const keys = Object.keys(map);
-  if (keys.length === 0) {
+  if (!incidents || incidents.length === 0) {
     return {
       timeline: [],
       peakDay: null,
       avgDaily: 0,
       totalCompressor: 0,
       totalDispenser: 0,
-      totalInflow: 0
+      totalInflow: 0,
+      velocityTrendPct: 0,
+      dominantEquipment: 'Balanced'
     };
   }
 
-  // Detect whether multiple calendar years are present
-  const years = new Set(keys.map(k => k.split('-')[0]));
-  const spansMultipleYears = years.size > 1;
+  // Pre-normalize all incidents with ISO dates and timestamps
+  const normalizedIncidents = incidents.map(inc => {
+    const iso = normalizeDateToISO(inc.date);
+    const [y, m, d] = iso.split('-').map(Number);
+    const time = y && m && d ? new Date(Date.UTC(y, m - 1, d)).getTime() : 0;
+    return {
+      ...inc,
+      isoDate: iso,
+      timestamp: time
+    };
+  }).filter(inc => inc.timestamp > 0);
 
-  // Build sorted array
-  const timeline: TimelineDataPoint[] = keys
-    .map(isoKey => {
-      const [y, m, d] = isoKey.split('-').map(Number);
-      const time = y && m && d ? new Date(y, m - 1, d).getTime() : 0;
-      const comp = map[isoKey].compressor;
-      const disp = map[isoKey].dispenser;
-      const tot = comp + disp;
+  if (normalizedIncidents.length === 0) {
+    return {
+      timeline: [],
+      peakDay: null,
+      avgDaily: 0,
+      totalCompressor: 0,
+      totalDispenser: 0,
+      totalInflow: 0,
+      velocityTrendPct: 0,
+      dominantEquipment: 'Balanced'
+    };
+  }
 
-      return {
-        dateKey: isoKey,
-        timestamp: time,
-        displayDate: formatTimelineLabel(isoKey, spansMultipleYears),
-        fullDate: formatFullDisplayDate(isoKey),
-        compressor: comp,
-        dispenser: disp,
-        total: tot
+  // Determine latest date in dataset to anchor range filtering
+  const maxDatasetTime = Math.max(...normalizedIncidents.map(i => i.timestamp));
+  let rangeThresholdTime = 0;
+  if (range === '7d') {
+    rangeThresholdTime = maxDatasetTime - (7 * 86400000);
+  } else if (range === '14d') {
+    rangeThresholdTime = maxDatasetTime - (14 * 86400000);
+  } else if (range === '30d') {
+    rangeThresholdTime = maxDatasetTime - (30 * 86400000);
+  } else if (range === '90d') {
+    rangeThresholdTime = maxDatasetTime - (90 * 86400000);
+  }
+
+  const rangeFilteredIncidents = rangeThresholdTime > 0
+    ? normalizedIncidents.filter(i => i.timestamp >= rangeThresholdTime)
+    : normalizedIncidents;
+
+  // Group into granularity buckets
+  interface BucketAccumulator {
+    dateKey: string;
+    timestamp: number;
+    displayDate: string;
+    fullDate: string;
+    compressor: number;
+    dispenser: number;
+    problemCounts: Record<string, number>;
+    zoneCounts: Record<string, number>;
+    rawDates: Set<string>;
+    count: number;
+  }
+
+  const bucketMap: Record<string, BucketAccumulator> = {};
+
+  // Detect whether dataset spans multiple calendar years
+  const allYears = new Set(rangeFilteredIncidents.map(i => i.isoDate.split('-')[0]));
+  const spansMultipleYears = allYears.size > 1;
+
+  rangeFilteredIncidents.forEach(inc => {
+    let bucketKey = inc.isoDate;
+    let display = formatTimelineLabel(inc.isoDate, spansMultipleYears);
+    let full = formatFullDisplayDate(inc.isoDate);
+    let bucketTime = inc.timestamp;
+
+    if (granularity === 'weekly') {
+      bucketKey = getMondayOfWeek(inc.isoDate);
+      const [y, m, d] = bucketKey.split('-').map(Number);
+      bucketTime = new Date(Date.UTC(y, m - 1, d)).getTime();
+      display = `Wk ${formatTimelineLabel(bucketKey, spansMultipleYears)}`;
+      full = `Week of Mon, ${formatFullDisplayDate(bucketKey)}`;
+    } else if (granularity === 'monthly') {
+      bucketKey = inc.isoDate.slice(0, 7) + '-01';
+      const [y, m] = inc.isoDate.split('-').map(Number);
+      bucketTime = new Date(Date.UTC(y, m - 1, 1)).getTime();
+      const mIdx = m >= 1 && m <= 12 ? m - 1 : 0;
+      display = `${MONTH_NAMES[mIdx]} '${String(y).slice(2)}`;
+      full = `${MONTH_NAMES[mIdx]} ${y} (Monthly Total)`;
+    }
+
+    if (!bucketMap[bucketKey]) {
+      bucketMap[bucketKey] = {
+        dateKey: bucketKey,
+        timestamp: bucketTime,
+        displayDate: display,
+        fullDate: full,
+        compressor: 0,
+        dispenser: 0,
+        problemCounts: {},
+        zoneCounts: {},
+        rawDates: new Set<string>(),
+        count: 0
       };
-    })
-    .sort((a, b) => a.timestamp - b.timestamp);
+    }
 
-  // Calculate Peak Day
-  let peakDay: { date: string; count: number; label: string } | null = null;
+    const bucket = bucketMap[bucketKey];
+    bucket.count += 1;
+    bucket.rawDates.add(inc.isoDate);
+
+    if (inc.equipmentType === 'Compressor') {
+      bucket.compressor += 1;
+    } else {
+      bucket.dispenser += 1;
+    }
+
+    if (inc.problem) {
+      const prob = inc.problem.trim();
+      bucket.problemCounts[prob] = (bucket.problemCounts[prob] || 0) + 1;
+    }
+    if (inc.zoneOrArea) {
+      const zone = inc.zoneOrArea.trim();
+      bucket.zoneCounts[zone] = (bucket.zoneCounts[zone] || 0) + 1;
+    }
+  });
+
+  const sortedBuckets = Object.values(bucketMap).sort((a, b) => a.timestamp - b.timestamp);
+
+  let runComp = 0;
+  let runDisp = 0;
+  let runTot = 0;
+
+  // Window for moving average (7 points for daily, 3 for weekly/monthly)
+  const windowSize = granularity === 'daily' ? 7 : 3;
+
+  const timeline: TimelineDataPoint[] = sortedBuckets.map((b, idx) => {
+    const tot = b.compressor + b.dispenser;
+    runComp += b.compressor;
+    runDisp += b.dispenser;
+    runTot += tot;
+
+    // Compute moving average over previous `windowSize` points
+    const startIdx = Math.max(0, idx - windowSize + 1);
+    const windowSlice = sortedBuckets.slice(startIdx, idx + 1);
+    const windowSum = windowSlice.reduce((sum, item) => sum + (item.compressor + item.dispenser), 0);
+    const mAvg = Number((windowSum / windowSlice.length).toFixed(1));
+
+    // Find top problem
+    let topProb = '';
+    let topProbCount = 0;
+    for (const [prob, count] of Object.entries(b.problemCounts)) {
+      if (count > topProbCount) {
+        topProb = prob;
+        topProbCount = count;
+      }
+    }
+
+    // Find top zone
+    let topZ = '';
+    let topZCount = 0;
+    for (const [zone, count] of Object.entries(b.zoneCounts)) {
+      if (count > topZCount) {
+        topZ = zone;
+        topZCount = count;
+      }
+    }
+
+    return {
+      dateKey: b.dateKey,
+      timestamp: b.timestamp,
+      displayDate: b.displayDate,
+      fullDate: b.fullDate,
+      compressor: b.compressor,
+      dispenser: b.dispenser,
+      total: tot,
+      cumulativeCompressor: runComp,
+      cumulativeDispenser: runDisp,
+      cumulativeTotal: runTot,
+      movingAverage: mAvg,
+      topProblem: topProb || undefined,
+      topProblemCount: topProbCount || undefined,
+      topZone: topZ || undefined,
+      topZoneCount: topZCount || undefined,
+      incidentsCount: b.count,
+      rawDateKeys: Array.from(b.rawDates)
+    };
+  });
+
+  // Calculate Peak Day / Peak Bucket
+  let peakDay: { date: string; count: number; label: string; compressor: number; dispenser: number } | null = null;
   let maxCount = 0;
   timeline.forEach(point => {
     if (point.total > maxCount) {
@@ -247,13 +425,35 @@ export function buildTimelineData(
       peakDay = {
         date: point.dateKey,
         count: point.total,
-        label: point.displayDate
+        label: point.displayDate,
+        compressor: point.compressor,
+        dispenser: point.dispenser
       };
     }
   });
 
-  const totalInflow = totalCompressor + totalDispenser;
+  const totalCompressor = runComp;
+  const totalDispenser = runDisp;
+  const totalInflow = runTot;
   const avgDaily = timeline.length > 0 ? Number((totalInflow / timeline.length).toFixed(1)) : 0;
+
+  // Velocity Trend: Compare second half of chronological series vs first half
+  let velocityTrendPct = 0;
+  if (timeline.length >= 2) {
+    const half = Math.floor(timeline.length / 2);
+    const firstHalfSum = timeline.slice(0, half).reduce((sum, p) => sum + p.total, 0);
+    const secondHalfSum = timeline.slice(half).reduce((sum, p) => sum + p.total, 0);
+    const denom = firstHalfSum > 0 ? firstHalfSum : 1;
+    velocityTrendPct = Math.round(((secondHalfSum - firstHalfSum) / denom) * 100);
+  }
+
+  // Dominant Equipment
+  let dominantEquipment: 'Compressor' | 'Dispenser' | 'Balanced' = 'Balanced';
+  if (totalCompressor > totalDispenser * 1.15) {
+    dominantEquipment = 'Compressor';
+  } else if (totalDispenser > totalCompressor * 1.15) {
+    dominantEquipment = 'Dispenser';
+  }
 
   return {
     timeline,
@@ -261,6 +461,9 @@ export function buildTimelineData(
     avgDaily,
     totalCompressor,
     totalDispenser,
-    totalInflow
+    totalInflow,
+    velocityTrendPct,
+    dominantEquipment
   };
 }
+

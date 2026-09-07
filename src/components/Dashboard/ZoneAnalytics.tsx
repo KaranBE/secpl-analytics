@@ -64,21 +64,6 @@ export const ZoneAnalytics: React.FC<ZoneAnalyticsProps> = ({
   const showGraphical = viewMode === 'both' || viewMode === 'graphical';
   const showTabular = viewMode === 'both' || viewMode === 'tabular';
 
-  const exportCSV = () => {
-    const headers = ['Zone,Total Complaints,Resolved,Open,SLA Percentage,Active Assets,Avg Resolution (Hours),Avg Response (Minutes),Lead Engineer,Top Problem'];
-    const rows = filteredZones.map(z => 
-      `"${z.zone}",${z.totalComplaints},${z.resolvedComplaints},${z.openComplaints},${z.slaPercentage}%,${z.activeAssets},${z.avgResolutionHours},${z.avgResponseMinutes},"${z.leadEngineer}","${z.topProblem}"`
-    );
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `zone_analytics_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   return (
     <div className="space-y-6">
       {/* Header Banner */}
