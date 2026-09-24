@@ -1,6 +1,18 @@
 import { CompressorRecord, DispenserSheetRecord, TicketStatus } from '../types';
 import { normalizeDateToISO } from '../utils/dateUtils';
-import { cleanEngineerName, isValidZone } from '../utils/cleanUtils';
+import {
+  cleanEngineerName,
+  isValidZone,
+  cleanSerialNumber,
+  cleanServiceType,
+  isValidProblemDescription,
+  cleanProblemDescription,
+  cleanActionTakenFromProblem,
+  containsDateAndStation,
+  containsNumberedItem10,
+  extractProblemFromTextOrRawMessage,
+  extractEngineerFromTextOrRawMessage
+} from '../utils/cleanUtils';
 
 export const COMPRESSOR_SPREADSHEET_ID = '1BdifU1B_GzUgs5dkcadQMZhMuOcveG_41m7OSsQr0MU';
 export const DISPENSER_SPREADSHEET_ID = '16rYwtl9mx_kWun3q-CqvBx57o5bcovAGvlQSjYarIMU';
@@ -92,8 +104,9 @@ export async function getSpreadsheetInfo(spreadsheetId: string, accessToken: str
  * Fetch 2D array of raw values from a specified spreadsheet tab.
  */
 export async function getSheetValues(spreadsheetId: string, sheetTitle: string, accessToken: string): Promise<string[][]> {
-  const range = `${encodeURIComponent(sheetTitle)}!A1:Z500`;
-  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`, {
+  const safeTitle = encodeURIComponent(`'${sheetTitle.replace(/'/g, "''")}'`);
+  const range = `${safeTitle}!A1:AZ5000`;
+  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?valueRenderOption=FORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json'
@@ -219,7 +232,16 @@ export async function fetchLiveCompressorRecords(
   }
 
   const headers = rawRows[0];
-  const dateIdx = findColIndex(headers, ['date', 'calldate', 'logdate'], ['time', 'stamp', 'hour']);
+  const dateIdx = findColIndex(
+    headers,
+    ['calldate', 'complaintdate', 'dateofcomplaint', 'servicedate', 'logdate', 'date'],
+    ['created', 'timestamp', 'hour', 'min', 'duration', 'reach', 'close']
+  );
+  const createdAtIdx = findColIndex(
+    headers,
+    ['createdat', 'created_at', 'createddate', 'datecreated', 'createdon', 'creationdate', 'createdtime', 'created', 'timestamp', 'timestamputc'],
+    ['hour', 'min', 'duration', 'reachtime', 'closetime', 'arrival']
+  );
   const custIdx = findColIndex(headers, ['customer', 'client', 'name']);
   const areaIdx = findColIndex(headers, ['area', 'zone', 'location', 'region'], ['time', 'stamp', 'date', 'num', 'no', 'phone', 'mobile', 'serial', 'id', 'sender']);
   const modelIdx = findColIndex(headers, ['model', 'equipment', 'compressormodel']);
@@ -259,20 +281,31 @@ export async function fetchLiveCompressorRecords(
     else if (rawContract.toLowerCase().includes('sla')) contract = 'Standard SLA';
 
     let compProblem = (problemIdx >= 0 ? row[problemIdx] : '')?.trim() || '';
-    if (!compProblem || isTimeString(compProblem)) {
+    const compCleaned = cleanActionTakenFromProblem(compProblem);
+    if (compCleaned) {
+      compProblem = compCleaned;
+    } else if (!compProblem || isTimeString(compProblem)) {
       compProblem = 'General Compressor Maintenance';
     }
 
     const rawArea = (areaIdx >= 0 ? row[areaIdx] : '')?.trim();
     const area = isValidZone(rawArea) ? rawArea : 'General Area';
 
+    const rawDate = dateIdx >= 0 ? row[dateIdx] : undefined;
+    const rawCreatedAt = createdAtIdx >= 0 ? row[createdAtIdx] : undefined;
+
+    // Normalize date from Date column, reconciling month with Created At
+    const normalizedDate = normalizeDateToISO(rawDate, rawCreatedAt);
+    const normalizedCreatedAt = normalizeDateToISO(rawCreatedAt || rawDate);
+
     records.push({
       id: `CMP-GS-${r + 100}`,
-      date: normalizeDateToISO(dateIdx >= 0 ? row[dateIdx] : undefined),
+      date: normalizedDate,
+      createdAt: normalizedCreatedAt,
       customerName: (custIdx >= 0 ? row[custIdx] : '')?.trim() || `Customer ${r}`,
       area,
       model: (modelIdx >= 0 ? row[modelIdx] : '')?.trim() || 'Standard Compressor',
-      serialNumber: (serialIdx >= 0 ? row[serialIdx] : '')?.trim() || `SN-CMP-${r}`,
+      serialNumber: cleanSerialNumber(serialIdx >= 0 ? row[serialIdx] : '') || `CMP-SN-${r}`,
       problem: compProblem,
       contract,
       supportEngineer: cleanEngineerName(engIdx >= 0 ? row[engIdx] : '') || 'Unassigned',
@@ -299,22 +332,146 @@ export async function fetchLiveDispenserRecords(
     throw new Error('No sheets found in Dispenser spreadsheet.');
   }
 
-  // Find most appropriate sheet (look for "dispenser", "sheet1", or first tab)
-  const chosenSheet = 
-    info.sheets.find(s => norm(s.title).includes('dispenser') || norm(s.title).includes('station')) ||
-    info.sheets[0];
+  // Find most appropriate sheet:
+  // 1. Look for dispenser/station keywords
+  // 2. Look for tickets, complaints, responses, log, data
+  // 3. Fall back to the sheet with the most rows
+  let chosenSheet = info.sheets.find(s => norm(s.title).includes('dispenser') || norm(s.title).includes('station'));
+  if (!chosenSheet) {
+    chosenSheet = info.sheets.find(s => 
+      norm(s.title).includes('complaint') || 
+      norm(s.title).includes('ticket') || 
+      norm(s.title).includes('response') || 
+      norm(s.title).includes('log') || 
+      norm(s.title).includes('sheet1') ||
+      norm(s.title).includes('data')
+    );
+  }
+  if (!chosenSheet) {
+    chosenSheet = info.sheets.slice().sort((a, b) => (b.rowCount || 0) - (a.rowCount || 0))[0] || info.sheets[0];
+  }
 
-  const rawRows = await getSheetValues(spreadsheetId, chosenSheet.title, accessToken);
+  let rawRows = await getSheetValues(spreadsheetId, chosenSheet.title, accessToken);
+
+  // If the chosen sheet has no data rows, search all other sheets to find the one that does
+  if (rawRows.length < 2 && info.sheets.length > 1) {
+    for (const otherSheet of info.sheets) {
+      if (otherSheet.title === chosenSheet.title) continue;
+      const otherRows = await getSheetValues(spreadsheetId, otherSheet.title, accessToken);
+      if (otherRows.length >= 2) {
+        chosenSheet = otherSheet;
+        rawRows = otherRows;
+        break;
+      }
+    }
+  }
+
   if (rawRows.length < 2) {
     return { records: [], sheetTitle: chosenSheet.title, spreadsheetTitle: info.title };
   }
 
-  const headers = rawRows[0];
-  const dateIdx = findColIndex(headers, ['date', 'calldate', 'logdate'], ['time', 'stamp', 'hour']);
-  const stationIdx = findColIndex(headers, ['stationname', 'station', 'retailoutlet', 'outlet', 'location', 'site']);
-  const serialIdx = findColIndex(headers, ['dispenserserial', 'serialnumber', 'serialno', 'serial', 'srno', 'sn']);
-  const serviceTypeIdx = findColIndex(headers, ['typeofservice', 'servicetype', 'calltype', 'service', 'category']);
-  const compTimeIdx = findColIndex(headers, ['complainttime', 'calltime', 'logtime', 'time']);
+  // Resilient header detection: scan the first 10 rows to find the true column headers
+  let headerRowIndex = 0;
+  let maxMatchedCols = 0;
+  const knownHeaderKeywords = ['date', 'calldate', 'station', 'outlet', 'serial', 'service', 'engineer', 'technician', 'problem', 'complaint', 'status', 'zone', 'area', 'wamid', 'sender'];
+
+  for (let r = 0; r < Math.min(rawRows.length, 10); r++) {
+    const row = rawRows[r];
+    if (!row || row.length === 0) continue;
+    let matches = 0;
+    for (const cell of row) {
+      const nCell = norm(cell);
+      if (knownHeaderKeywords.some(kw => nCell.includes(kw))) {
+        matches++;
+      }
+    }
+    if (matches > maxMatchedCols) {
+      maxMatchedCols = matches;
+      headerRowIndex = r;
+    }
+  }
+
+  const headers = rawRows[headerRowIndex] || [];
+
+  // 1. Identify "Date" Column from Sheet (Date, Complaint Date, Service Date, Call Date, Visit Date)
+  // Per user instruction: "date filter should work on date column in the sheet but check the month in the created at column"
+  let dateIdx = findColIndex(
+    headers,
+    ['calldate', 'complaintdate', 'dateofcomplaint', 'servicedate', 'dateofcall', 'entrydate', 'visitdate', 'logdate', 'date'],
+    ['created', 'timestamp', 'hour', 'min', 'sec', 'duration', 'reach', 'close', 'arrival']
+  );
+  if (dateIdx < 0) {
+    dateIdx = findColIndex(
+      headers,
+      ['calldatetime', 'datetime', 'dateandtime'],
+      ['created', 'timestamp', 'hour', 'min', 'sec', 'duration', 'reach', 'close', 'arrival']
+    );
+  }
+  if (dateIdx < 0) {
+    dateIdx = headers.findIndex(h => {
+      const n = norm(h);
+      return n.includes('date') && !n.includes('create') && !n.includes('update');
+    });
+  }
+
+  // 2. Identify "Created At" Column from Sheet (Created At, Timestamp, Creation Date, Logged At)
+  let createdAtIdx = findColIndex(
+    headers,
+    [
+      'createdat',
+      'created_at',
+      'createddate',
+      'datecreated',
+      'createdon',
+      'creationdate',
+      'createdtime',
+      'created',
+      'timestamp',
+      'timestamputc',
+      'loggedat'
+    ],
+    ['hour', 'min', 'sec', 'duration', 'reachtime', 'closetime', 'arrival']
+  );
+
+  // If dateIdx still not found, sample row cell check
+  if (dateIdx < 0 && rawRows.length > headerRowIndex + 1) {
+    const sampleRow = rawRows[headerRowIndex + 1];
+    for (let c = 0; c < sampleRow.length; c++) {
+      if (c === createdAtIdx) continue;
+      const cell = (sampleRow[c] || '').trim();
+      if (/^\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}/.test(cell) || /^\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2}/.test(cell)) {
+        dateIdx = c;
+        break;
+      }
+    }
+  }
+
+  // If dateIdx is still not found, fallback to createdAtIdx
+  if (dateIdx < 0 && createdAtIdx >= 0) {
+    dateIdx = createdAtIdx;
+  }
+  // Priority 5: Sample row cell format detection
+  if (dateIdx < 0 && rawRows.length > headerRowIndex + 1) {
+    const sampleRow = rawRows[headerRowIndex + 1];
+    for (let c = 0; c < sampleRow.length; c++) {
+      const cell = (sampleRow[c] || '').trim();
+      if (/^\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}/.test(cell) || /^\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2}/.test(cell)) {
+        dateIdx = c;
+        break;
+      }
+    }
+  }
+
+  const stationIdx = findColIndex(headers, ['stationname', 'station', 'retailoutlet', 'outlet', 'location', 'site', 'customer']);
+  
+  // Dispenser Serial: exclude generic 'srno' / row counters from matching before actual machine serial
+  const serialIdx = findColIndex(
+    headers,
+    ['dispenserserial', 'dispenserserialno', 'dispensersn', 'machineserial', 'assetserial', 'serialnumber', 'serialno', 'serial'],
+    ['time', 'date', 'sender', 'phone', 'mobile', 'zone', 'area', 'station', 'outlet', 'engineer']
+  );
+  const serviceTypeIdx = findColIndex(headers, ['service', 'typeofservice', 'servicetype', 'calltype', 'natureofservice', 'category', 'type'], ['engineer', 'station', 'time', 'date', 'num', 'no', 'serial']);
+  const compTimeIdx = findColIndex(headers, ['complainttime', 'calltime', 'logtime', 'time'], ['date', 'reach', 'close', 'arrival']);
   const reachTimeIdx = findColIndex(headers, ['reachtime', 'arrivaltime', 'arrival', 'responsetime']);
   const closeTimeIdx = findColIndex(headers, ['closetime', 'resolutiontime', 'completedtime', 'endtime']);
   const zoneIdx = findColIndex(headers, ['zonename', 'zone', 'area', 'region'], ['time', 'stamp', 'date', 'num', 'no', 'phone', 'mobile', 'serial', 'id', 'sender']);
@@ -346,12 +503,37 @@ export async function fetchLiveDispenserRecords(
   const wamidIdx = findColIndex(headers, ['whatsapp', 'messageid', 'wamid', 'id']);
   const senderIdx = findColIndex(headers, ['sender', 'number', 'phone', 'mobile']);
   const statusIdx = findColIndex(headers, ['status', 'ticketstatus', 'state']);
+  const rawMsgIdx = findColIndex(
+    headers,
+    ['rawmessage', 'whatsappmessage', 'messagetext', 'fullmessage', 'message', 'msg', 'body', 'raw', 'content', 'payload', 'chat', 'log', 'text'],
+    ['id', 'wamid', 'time', 'date', 'sender', 'phone', 'serial', 'station']
+  );
 
   const records: DispenserSheetRecord[] = [];
 
-  for (let r = 1; r < rawRows.length; r++) {
+  for (let r = headerRowIndex + 1; r < rawRows.length; r++) {
     const row = rawRows[r];
     if (!row || row.every(cell => !cell || !cell.trim())) continue;
+
+    // Skip row if it is a secondary or repeated header row
+    const firstFewCells = row.slice(0, 5).map(c => (c || '').trim().toLowerCase());
+    if (firstFewCells.includes('date') || firstFewCells.includes('station name') || firstFewCells.includes('station')) {
+      continue;
+    }
+
+    const stationName = (stationIdx >= 0 ? row[stationIdx] : '')?.trim() || '';
+    const rawEng = (engIdx >= 0 ? row[engIdx] : '')?.trim() || '';
+    const engName = cleanEngineerName(rawEng);
+    const rawMsg = (rawMsgIdx >= 0 ? row[rawMsgIdx] : '')?.trim() || '';
+
+    // Extract engineer name from raw message containing text "Service engineer", "service engineer name" and variations
+    const extractedEng = extractEngineerFromTextOrRawMessage(
+      rawMsg,
+      (problemIdx >= 0 ? row[problemIdx] : ''),
+      (wamidIdx >= 0 ? row[wamidIdx] : ''),
+      ...row
+    );
+    const assignedEngineer = extractedEng || engName || 'Unassigned';
 
     const rawCloseTime = (closeTimeIdx >= 0 ? row[closeTimeIdx] : '').trim();
     const rawStatus = (statusIdx >= 0 ? row[statusIdx] : '').trim().toLowerCase();
@@ -364,73 +546,109 @@ export async function fetchLiveDispenserRecords(
     }
 
     const rawServiceType = (serviceTypeIdx >= 0 ? row[serviceTypeIdx] : '').trim();
-    let typeOfService: DispenserSheetRecord['typeOfService'] = 'Breakdown';
-    if (rawServiceType.toLowerCase().includes('prevent')) typeOfService = 'Preventive Maintenance';
-    else if (rawServiceType.toLowerCase().includes('calib')) typeOfService = 'Calibration';
-    else if (rawServiceType.toLowerCase().includes('inspect')) typeOfService = 'Inspection';
-    else if (rawServiceType.toLowerCase().includes('emerg')) typeOfService = 'Emergency Callout';
+    const typeOfService = rawServiceType || 'BM';
 
-    // Extract problem, ensuring it NEVER contains or defaults to a time string
+    // Extract problem:
+    // 1. Check if problem column has content
+    // 2. If it contains date & station name, check text starting with (10) or other variation,
+    //    or check after service engineer text, or check the raw message even if problem keyword is missing at the end!
     let problemVal = (problemIdx >= 0 ? row[problemIdx] : '')?.trim() || '';
 
-    // If the detected value is a clock time (e.g., "08:45 AM", "14:30") or empty:
-    if (!problemVal || isTimeString(problemVal)) {
-      // Search the row for any other cell that contains a real text description
-      let alternativeText = '';
-      for (let c = 0; c < row.length; c++) {
-        if (
-          c === dateIdx || 
-          c === stationIdx || 
-          c === serialIdx || 
-          c === serviceTypeIdx || 
-          c === compTimeIdx || 
-          c === reachTimeIdx || 
-          c === closeTimeIdx || 
-          c === zoneIdx || 
-          c === engIdx || 
-          c === wamidIdx || 
-          c === senderIdx || 
-          c === statusIdx
-        ) {
-          continue;
-        }
-        const cell = (row[c] || '').trim();
-        if (cell && !isTimeString(cell) && cell.length > 2 && !/^\+?\d[\d\s\-]{6,}$/.test(cell) && !/^\d{4}-\d{2}-\d{2}$/.test(cell)) {
-          alternativeText = cell;
-          break;
-        }
-      }
+    // Strip .action taken:-, .action takan:-, .Action Tekan :-, etc.
+    const cleanedProblem = cleanActionTakenFromProblem(problemVal);
+    if (cleanedProblem) {
+      problemVal = cleanedProblem;
+    } else if (problemVal) {
+      // If it was purely an action taken marker with no value, reset to empty so extraction logic runs
+      problemVal = '';
+    }
 
-      if (alternativeText) {
-        problemVal = alternativeText;
-      } else {
-        // Fallback to equipment-appropriate service type description, NEVER a time string
-        problemVal = typeOfService === 'Breakdown'
-          ? 'Dispenser Breakdown'
-          : typeOfService === 'Preventive Maintenance'
-            ? 'Preventive Maintenance Inspection'
-            : typeOfService === 'Calibration'
-              ? 'Flow Meter Calibration Check'
-              : typeOfService === 'Emergency Callout'
-                ? 'Emergency Dispenser Service'
-                : 'Dispenser Component Check';
+    // If problemVal contains date, station name, template formatting or (10):
+    if (
+      containsDateAndStation(problemVal, stationName) ||
+      containsNumberedItem10(problemVal) ||
+      !isValidProblemDescription(problemVal, stationName)
+    ) {
+      const extracted = extractProblemFromTextOrRawMessage(problemVal, rawMsg, stationName, engName);
+      if (extracted && isValidProblemDescription(extracted, stationName)) {
+        problemVal = cleanActionTakenFromProblem(extracted) || extracted;
       }
     }
 
+    // If problemVal is still invalid or empty:
+    if (!isValidProblemDescription(problemVal, stationName)) {
+      // Try extracting from rawMsg column
+      if (rawMsg) {
+        const extractedFromRaw = extractProblemFromTextOrRawMessage(rawMsg, undefined, stationName, engName);
+        if (extractedFromRaw && isValidProblemDescription(extractedFromRaw, stationName)) {
+          problemVal = cleanActionTakenFromProblem(extractedFromRaw) || extractedFromRaw;
+        }
+      }
+
+      // Check all other row cells for composite WhatsApp text or (10) or text after service engineer
+      if (!isValidProblemDescription(problemVal, stationName)) {
+        for (let c = 0; c < row.length; c++) {
+          if (
+            c === dateIdx || 
+            c === stationIdx || 
+            c === serialIdx || 
+            c === serviceTypeIdx || 
+            c === compTimeIdx || 
+            c === reachTimeIdx || 
+            c === closeTimeIdx || 
+            c === zoneIdx || 
+            c === engIdx || 
+            c === wamidIdx || 
+            c === senderIdx || 
+            c === statusIdx ||
+            c === rawMsgIdx
+          ) {
+            continue;
+          }
+          const cell = (row[c] || '').trim();
+          if (cell) {
+            const extracted = extractProblemFromTextOrRawMessage(cell, rawMsg, stationName, engName);
+            if (extracted && isValidProblemDescription(extracted, stationName)) {
+              problemVal = cleanActionTakenFromProblem(extracted) || extracted;
+              break;
+            }
+          }
+        }
+      }
+
+      // Final fallback to clean description according to service type
+      if (!isValidProblemDescription(problemVal, stationName)) {
+        problemVal = cleanProblemDescription(problemVal, typeOfService, stationName, rawMsg, engName);
+      }
+    }
+
+    // Ensure final problemVal is clean of any action taken variation
+    problemVal = cleanActionTakenFromProblem(problemVal) || problemVal;
+
     const rawZone = (zoneIdx >= 0 ? row[zoneIdx] : '')?.trim();
     const zoneName = isValidZone(rawZone) ? rawZone : 'North Zone';
+    const rawSerial = (serialIdx >= 0 ? row[serialIdx] : '')?.trim();
+    const dispenserSerialNo = cleanSerialNumber(rawSerial) || `DSP-${r}`;
+
+    const rawDate = dateIdx >= 0 ? row[dateIdx] : undefined;
+    const rawCreatedAt = createdAtIdx >= 0 ? row[createdAtIdx] : undefined;
+
+    // Normalize date from Date column, reconciling month with Created At
+    const normalizedDate = normalizeDateToISO(rawDate, rawCreatedAt);
+    const normalizedCreatedAt = normalizeDateToISO(rawCreatedAt || rawDate);
 
     records.push({
       id: `DSP-GS-${r + 200}`,
-      date: normalizeDateToISO(dateIdx >= 0 ? row[dateIdx] : undefined),
+      date: normalizedDate,
+      createdAt: normalizedCreatedAt,
       stationName: (stationIdx >= 0 ? row[stationIdx] : '')?.trim() || `Station Outlet ${r}`,
-      dispenserSerialNo: (serialIdx >= 0 ? row[serialIdx] : '')?.trim() || `SN-DSP-${r}`,
+      dispenserSerialNo,
       typeOfService,
       complaintTime: (compTimeIdx >= 0 ? row[compTimeIdx] : '')?.trim() || '09:00 AM',
       reachTime: (reachTimeIdx >= 0 ? row[reachTimeIdx] : '')?.trim() || '09:40 AM',
       closeTime: rawCloseTime || (status === 'Closed' ? '11:30 AM' : '-'),
       zoneName,
-      serviceEngineerName: cleanEngineerName(engIdx >= 0 ? row[engIdx] : '') || 'Service Lead',
+      serviceEngineerName: assignedEngineer,
       problem: problemVal,
       whatsappMessageId: (wamidIdx >= 0 ? row[wamidIdx] : '')?.trim() || `wamid.DSP_GS_${r}`,
       senderNumber: (senderIdx >= 0 ? row[senderIdx] : '')?.trim() || '+91 98000 00000',

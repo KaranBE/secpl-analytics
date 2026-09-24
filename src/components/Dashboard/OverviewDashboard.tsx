@@ -10,6 +10,7 @@ import {
 } from '../../types';
 import { 
   normalizeDateToISO,
+  formatTimelineLabel,
   TimelineDataPoint 
 } from '../../utils/dateUtils';
 import { DualSheetTimeline } from './DualSheetTimeline';
@@ -43,8 +44,10 @@ import {
   SlidersHorizontal,
   X,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  Fuel
 } from 'lucide-react';
+import { cleanServiceType, isBMServiceType, isPMServiceType } from '../../utils/cleanUtils';
 import { 
   Tooltip, 
   ResponsiveContainer, 
@@ -88,17 +91,17 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   // Overall Statistics
   const totalIncidents = incidents.length;
   const closedIncidents = incidents.filter(i => i.status === 'Closed').length;
-  const openIncidents = totalIncidents - closedIncidents;
   const resolutionRate = totalIncidents > 0 ? ((closedIncidents / totalIncidents) * 100).toFixed(1) : '100';
 
-  const compressorCount = incidents.filter(i => i.equipmentType === 'Compressor').length;
-  const dispenserCount = incidents.filter(i => i.equipmentType === 'Dispenser').length;
+  const bmCount = incidents.filter(i => isBMServiceType(i.contractOrServiceType)).length;
+  const pmCount = incidents.filter(i => isPMServiceType(i.contractOrServiceType)).length;
+  const uniqueStationsCount = useMemo(() => new Set(incidents.map(i => i.entityName.trim()).filter(Boolean)).size, [incidents]);
 
-  // Equipment distribution
-  const equipmentPieData = [
-    { name: 'Compressors', value: compressorCount, color: '#4f46e5' },
-    { name: 'Dispensers', value: dispenserCount, color: '#10b981' }
-  ];
+  // Service Type distribution (BM vs PM from service column)
+  const serviceTypePieData = [
+    { name: 'BM (Breakdown)', value: bmCount, color: '#f43f5e' },
+    { name: 'PM (Preventive)', value: pmCount, color: '#0ea5e9' }
+  ].filter(d => d.value > 0);
 
   // Top failure problems
   const problemCounts: Record<string, number> = {};
@@ -161,73 +164,75 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     <div className="space-y-6">
       {/* KPI Metric Cards Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Total Service Calls */}
+        {/* Total Complaints */}
         <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs hover:border-slate-300 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Total Inquiries</span>
+            <span className="text-xs font-semibold text-slate-500">Total Complaints</span>
             <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
               <Activity className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-2xl font-extrabold text-slate-900">{totalIncidents}</span>
-            <span className="text-[10px] font-bold text-indigo-600">Dual Sheet</span>
+            <span className="text-[10px] font-bold text-indigo-600">Dispenser</span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Cross-system service events</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Dispenser service logs</p>
         </div>
 
-        {/* Open Incidents Backlog */}
+        {/* Breakdown Maintenance (BM) */}
         <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs hover:border-slate-300 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Open Incidents</span>
-            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
-              <Clock className="w-3.5 h-3.5" />
-            </div>
-          </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold text-amber-600">{openIncidents}</span>
-            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.2 rounded-md">
-              In Field
-            </span>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Pending engineer signoff</p>
-        </div>
-
-        {/* Compressor Calls */}
-        <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs hover:border-slate-300 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Compressor Calls</span>
-            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-              <Gauge className="w-3.5 h-3.5" />
-            </div>
-          </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold text-slate-900">{compressorCount}</span>
-            <span className="text-[10px] font-bold text-blue-600">{customerMetrics.length} Clients</span>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Industrial unit calls</p>
-        </div>
-
-        {/* Dispenser Calls */}
-        <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs hover:border-slate-300 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Dispenser Calls</span>
-            <div className="p-1.5 rounded-lg bg-teal-50 text-teal-600">
+            <span className="text-xs font-semibold text-slate-500">Breakdown (BM)</span>
+            <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
               <Wrench className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold text-slate-900">{dispenserCount}</span>
-            <span className="text-[10px] font-bold text-teal-600">Retail Stations</span>
+            <span className="text-2xl font-extrabold text-rose-600">{bmCount}</span>
+            <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.2 rounded-md">
+              {totalIncidents > 0 ? Math.round((bmCount / totalIncidents) * 100) : 0}%
+            </span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Dispenser maintenance logs</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Breakdown repair calls</p>
+        </div>
+
+        {/* Preventive Maintenance (PM) */}
+        <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs hover:border-slate-300 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">Preventive (PM)</span>
+            <div className="p-1.5 rounded-lg bg-sky-50 text-sky-600">
+              <ShieldCheck className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-sky-700">{pmCount}</span>
+            <span className="text-[10px] font-bold text-sky-700 bg-sky-100 px-1.5 py-0.2 rounded-md">
+              {totalIncidents > 0 ? Math.round((pmCount / totalIncidents) * 100) : 0}%
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-0.5">Scheduled preventive service</p>
+        </div>
+
+        {/* No. of Stations */}
+        <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs hover:border-slate-300 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">No. of Stations</span>
+            <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+              <Fuel className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-slate-900">{uniqueStationsCount}</span>
+            <span className="text-[10px] font-bold text-emerald-600">Station Outlets</span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-0.5">Serviced station locations</p>
         </div>
       </div>
 
       {/* GRAPHICAL DATA VIEW */}
       {showGraphical && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Chart 1: Upgraded Dual-Sheet Inflow Timeline */}
+          {/* Chart 1: Incident Inflow Timeline */}
           <DualSheetTimeline
             incidents={incidents}
             selectedTimelineBucket={selectedTimelineBucket}
@@ -236,15 +241,15 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             onToggleExpand={() => setIsExpandedTimeline(!isExpandedTimeline)}
           />
 
-          {/* Chart 2: Equipment Split & Failure Pareto (adjusts if expanded) */}
+          {/* Chart 2: Service Type Distribution (BM vs PM from service column) */}
           <div className={`${isExpandedTimeline ? 'lg:col-span-3' : 'lg:col-span-1'} bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between`}>
             <div>
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-1">
                 <BarChart3 className="w-4 h-4 text-indigo-600" />
-                Equipment Distribution
+                Service Type Distribution
               </h3>
               <p className="text-xs text-slate-500 mb-3">
-                Volume proportion between sheets
+                Breakdown (BM) vs Preventive Maintenance (PM)
               </p>
             </div>
 
@@ -252,7 +257,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={equipmentPieData}
+                    data={serviceTypePieData}
                     cx="50%"
                     cy="50%"
                     innerRadius={isExpandedTimeline ? 56 : 44}
@@ -260,7 +265,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     paddingAngle={4}
                     dataKey="value"
                   >
-                    {equipmentPieData.map((entry, index) => (
+                    {serviceTypePieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -272,7 +277,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
 
             <div className="space-y-2 pt-2 border-t border-slate-100">
-              {equipmentPieData.map((item) => (
+              {serviceTypePieData.map((item) => (
                 <div key={item.name} className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>
@@ -289,7 +294,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       )}
 
       {/* Module Shortcuts Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Zone Analysis Card */}
         <div 
           onClick={() => onNavigateToTab('zones')}
@@ -335,29 +340,6 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             <span>&rarr;</span>
           </div>
         </div>
-
-        {/* Customer Analysis Card (Only Compressor) */}
-        <div 
-          onClick={() => onNavigateToTab('customers')}
-          className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs hover:border-blue-400 hover:shadow-sm transition-all cursor-pointer group flex flex-col justify-between"
-        >
-          <div>
-            <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                <Building2 className="w-5 h-5" />
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
-            </div>
-            <h4 className="text-sm font-bold text-slate-900 mt-3">Customer Analysis (Compressor)</h4>
-            <p className="text-xs text-slate-500 mt-1">
-              Dedicated analysis for compressor industrial accounts, AMC contract SLA breakdown, and asset serial tracking.
-            </p>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-blue-600 font-semibold">
-            <span>Explore Accounts</span>
-            <span>&rarr;</span>
-          </div>
-        </div>
       </div>
 
       {/* TABULAR DATA VIEW */}
@@ -367,10 +349,10 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             <div>
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <TableIcon className="w-4 h-4 text-indigo-600" />
-                Unified Dual-Sheet Incident Master Registry
+                Incident Master Registry
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Complete operational log uniting Compressor & Dispenser Google Sheet streams
+                Complete operational log for Dispenser Google Sheet streams
               </p>
             </div>
 
@@ -384,7 +366,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     setTableSearch(e.target.value);
                     setTablePage(1);
                   }}
-                  placeholder="Filter customer, station, problem..."
+                  placeholder="Filter station, problem..."
                   className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 w-52 sm:w-64"
                 />
               </div>
@@ -428,12 +410,12 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 shadow-xs">
                   <tr className="text-slate-600 font-semibold">
                     <th className="py-3 px-3 bg-slate-50">Date</th>
-                    <th className="py-3 px-3 bg-slate-50">Source Sheet</th>
-                    <th className="py-3 px-3 bg-slate-50">Customer / Station</th>
+                    <th className="py-3 px-3 bg-slate-50">Service Type</th>
+                    <th className="py-3 px-3 bg-slate-50">Station Name</th>
                     <th className="py-3 px-3 bg-slate-50">Zone / Area</th>
-                    <th className="py-3 px-3 bg-slate-50">Asset Serial / Model</th>
+                    <th className="py-3 px-3 bg-slate-50">Dispenser Serial No</th>
                     <th className="py-3 px-3 bg-slate-50">Reported Problem</th>
-                    <th className="py-3 px-3 bg-slate-50">Engineer Lead</th>
+                    <th className="py-3 px-3 bg-slate-50">Engineer Assigned</th>
                     <th className="py-3 px-3 text-center bg-slate-50">Status</th>
                     <th className="py-3 px-3 bg-slate-50">WhatsApp Sender</th>
                   </tr>
@@ -447,20 +429,24 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   {virtualScroll.virtualItems.map(({ index }) => {
                     const inc = filteredTableIncidents[index];
                     if (!inc) return null;
+                    const sType = cleanServiceType(inc.contractOrServiceType) || 'BM';
                     return (
                       <tr 
                         key={inc.id} 
                         onClick={() => setSelectedIncident(inc)}
-                        className="hover:bg-slate-50/80 transition-colors cursor-pointer h-[48px]"
+                        className="hover:bg-slate-50/80 transition-colors cursor-pointer min-h-[48px]"
                       >
-                        <td className="py-2.5 px-3 font-mono text-slate-600 whitespace-nowrap">{inc.date}</td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <div className="font-semibold text-slate-800 text-xs">{formatTimelineLabel(inc.date, true)}</div>
+                          <div className="text-[10px] font-mono text-slate-400">{inc.date}</div>
+                        </td>
                         <td className="py-2.5 px-3 whitespace-nowrap">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            inc.equipmentType === 'Compressor' 
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-                              : 'bg-teal-50 text-teal-700 border border-teal-200'
+                            sType === 'BM'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200' 
+                              : 'bg-sky-50 text-sky-700 border border-sky-200'
                           }`}>
-                            {inc.equipmentType}
+                            {sType}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 font-bold text-slate-900">{inc.entityName}</td>
@@ -472,7 +458,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                         <td className="py-2.5 px-3 font-mono text-slate-600 truncate max-w-[120px]" title={inc.assetIdentifier}>
                           {inc.assetIdentifier}
                         </td>
-                        <td className="py-2.5 px-3 font-medium text-slate-800 max-w-xs truncate" title={inc.problem}>
+                        <td className="py-2.5 px-3 font-medium text-slate-800 break-words whitespace-normal min-w-[200px] max-w-sm leading-snug" title={inc.problem}>
                           {inc.problem}
                         </td>
                         <td className="py-2.5 px-3 font-semibold text-slate-800 whitespace-nowrap">{inc.engineer}</td>
@@ -504,31 +490,36 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 <thead className="bg-slate-50/70 border-b border-slate-200">
                   <tr className="text-slate-500 font-semibold">
                     <th className="py-3 px-3">Date</th>
-                    <th className="py-3 px-3">Source Sheet</th>
-                    <th className="py-3 px-3">Customer / Station</th>
+                    <th className="py-3 px-3">Service Type</th>
+                    <th className="py-3 px-3">Station Name</th>
                     <th className="py-3 px-3">Zone / Area</th>
-                    <th className="py-3 px-3">Asset Serial / Model</th>
+                    <th className="py-3 px-3">Dispenser Serial No</th>
                     <th className="py-3 px-3">Reported Problem</th>
-                    <th className="py-3 px-3">Engineer Lead</th>
+                    <th className="py-3 px-3">Engineer Assigned</th>
                     <th className="py-3 px-3 text-center">Status</th>
                     <th className="py-3 px-3">WhatsApp Sender</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {paginatedIncidents.map((inc) => (
+                  {paginatedIncidents.map((inc) => {
+                    const sType = cleanServiceType(inc.contractOrServiceType) || 'BM';
+                    return (
                     <tr 
                       key={inc.id} 
                       onClick={() => setSelectedIncident(inc)}
                       className="hover:bg-slate-50/80 transition-colors cursor-pointer"
                     >
-                      <td className="py-3 px-3 font-mono text-slate-600 whitespace-nowrap">{inc.date}</td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <div className="font-semibold text-slate-800 text-xs">{formatTimelineLabel(inc.date, true)}</div>
+                        <div className="text-[10px] font-mono text-slate-400">{inc.date}</div>
+                      </td>
                       <td className="py-3 px-3 whitespace-nowrap">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          inc.equipmentType === 'Compressor' 
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-                            : 'bg-teal-50 text-teal-700 border border-teal-200'
+                          sType === 'BM'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200' 
+                            : 'bg-sky-50 text-sky-700 border border-sky-200'
                         }`}>
-                          {inc.equipmentType}
+                          {sType}
                         </span>
                       </td>
                       <td className="py-3 px-3 font-bold text-slate-900">{inc.entityName}</td>
@@ -540,7 +531,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                       <td className="py-3 px-3 font-mono text-slate-600 truncate max-w-[120px]" title={inc.assetIdentifier}>
                         {inc.assetIdentifier}
                       </td>
-                      <td className="py-3 px-3 font-medium text-slate-800 max-w-xs truncate" title={inc.problem}>
+                      <td className="py-3 px-3 font-medium text-slate-800 break-words whitespace-normal min-w-[200px] max-w-sm leading-snug" title={inc.problem}>
                         {inc.problem}
                       </td>
                       <td className="py-3 px-3 font-semibold text-slate-800 whitespace-nowrap">{inc.engineer}</td>
@@ -556,7 +547,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                         {inc.senderNumber}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

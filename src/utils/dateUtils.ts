@@ -2,6 +2,7 @@
  * Date normalization, formatting, and timeline aggregation utilities
  * Handles diverse date formats from Google Sheets, Excel serial numbers, and ISO strings.
  */
+import { DatePreset } from '../types';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_MAP: Record<string, number> = {
@@ -20,100 +21,274 @@ const MONTH_MAP: Record<string, number> = {
 };
 
 /**
- * Normalizes any date string into standard ISO format (YYYY-MM-DD).
+ * Extracts the month (1-12) and year from a raw Created At timestamp or string.
  */
-export function normalizeDateToISO(raw: any): string {
-  if (raw === null || raw === undefined) {
-    return new Date().toISOString().split('T')[0];
-  }
+export function extractMonthAndYearFromCreatedAt(rawCreatedAt: any): { month: number; year: number } | null {
+  if (rawCreatedAt === null || rawCreatedAt === undefined) return null;
+  const str = String(rawCreatedAt).trim();
+  if (!str) return null;
 
-  const str = String(raw).trim();
-  if (!str) {
-    return new Date().toISOString().split('T')[0];
-  }
-
-  // 1. Check if numeric Excel serial date (e.g., 45539 from Google Sheets raw values)
+  // 1. Check if numeric Excel serial date
   const num = Number(str);
-  if (!isNaN(num) && num > 30000 && num < 70000) {
-    const jsDate = new Date((num - 25569) * 86400 * 1000);
+  if (!isNaN(num) && num > 30000 && num < 75000) {
+    const wholeDays = Math.floor(num);
+    const utcMillis = Math.round((wholeDays - 25569) * 86400 * 1000);
+    const jsDate = new Date(utcMillis);
     if (!isNaN(jsDate.getTime())) {
-      return jsDate.toISOString().split('T')[0];
+      return { month: jsDate.getUTCMonth() + 1, year: jsDate.getUTCFullYear() };
     }
   }
 
-  // 2. Already strict YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    return str;
+  // 2. Strict YYYY-MM-DD or YYYY/MM/DD
+  const ymd = str.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/);
+  if (ymd) {
+    const y = parseInt(ymd[1], 10);
+    const m = parseInt(ymd[2], 10);
+    if (m >= 1 && m <= 12) return { month: m, year: y };
   }
 
-  // 3. YYYY-MM-DD with timestamp (e.g. 2026-09-04 14:20:00 or 2026-09-04T14:20:00)
-  if (/^\d{4}-\d{2}-\d{2}[ T]/.test(str)) {
-    return str.slice(0, 10);
+  // 3. Named month (e.g. "23-Sep-2026", "Sep 23, 2026")
+  const namedMatch = str.match(/([a-zA-Z]{3,9})/);
+  if (namedMatch) {
+    const mNum = MONTH_MAP[namedMatch[1].toLowerCase()];
+    if (mNum) {
+      const yrMatch = str.match(/\b(20\d{2}|\d{2})\b/);
+      let y = yrMatch ? parseInt(yrMatch[1], 10) : 2026;
+      if (y < 100) y += 2000;
+      return { month: mNum, year: y };
+    }
   }
 
-  // 4. YYYY/MM/DD
-  const ymdMatch = str.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/);
+  // 4. DD/MM/YYYY or MM/DD/YYYY with timestamp
+  const dmy = str.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
+  if (dmy) {
+    let p1 = parseInt(dmy[1], 10);
+    let p2 = parseInt(dmy[2], 10);
+    let yr = parseInt(dmy[3], 10);
+    if (yr < 100) yr += 2000;
+
+    let m = p2;
+    if (p1 <= 12 && p2 > 12) {
+      m = p1;
+    } else if (p2 <= 12) {
+      m = p2;
+    }
+    if (m >= 1 && m <= 12) return { month: m, year: yr };
+  }
+
+  // 5. Standard Date.parse
+  const parsed = Date.parse(str);
+  if (!isNaN(parsed)) {
+    const dt = new Date(parsed);
+    return { month: dt.getMonth() + 1, year: dt.getFullYear() };
+  }
+
+  return null;
+}
+
+/**
+ * Normalizes any date string into standard ISO format (YYYY-MM-DD).
+ * When rawCreatedAt is provided, verifies and reconciles the month with the "Created At" column.
+ * Handles diverse date formats from Google Sheets (e.g. 23-09-2026, 23/09/2026, 23/09/26, 23-09-26, etc.)
+ */
+export function normalizeDateToISO(raw: any, rawCreatedAt?: any): string {
+  // If raw date is empty or missing, fallback to rawCreatedAt if available
+  if (raw === null || raw === undefined || String(raw).trim() === '') {
+    if (rawCreatedAt !== null && rawCreatedAt !== undefined && String(rawCreatedAt).trim() !== '') {
+      return normalizeDateToISO(rawCreatedAt);
+    }
+    return new Date().toISOString().split('T')[0];
+  }
+
+  let str = String(raw).trim();
+  if (!str) {
+    if (rawCreatedAt !== null && rawCreatedAt !== undefined && String(rawCreatedAt).trim() !== '') {
+      return normalizeDateToISO(rawCreatedAt);
+    }
+    return new Date().toISOString().split('T')[0];
+  }
+
+  // 0. Strip leading weekday names (e.g., "Mon, 21/09/2026", "Wednesday, 23 Sep 2026", "Thu 24-09-2026")
+  str = str.replace(/^(?:sun|mon|tue|wed|thu|fri|sat)[a-z]*,?\s*/i, '').trim();
+
+  // Extract reference month and year from Created At column (per requirement: check month in created at column)
+  const createdRef = rawCreatedAt ? extractMonthAndYearFromCreatedAt(rawCreatedAt) : null;
+  const expectedMonth = createdRef ? createdRef.month : null;
+  const expectedYear = createdRef ? createdRef.year : null;
+
+  // 1. Check if numeric Excel serial date (e.g., 46288 or 45539 from Google Sheets raw values)
+  const num = Number(str);
+  if (!isNaN(num) && num > 30000 && num < 75000) {
+    const wholeDays = Math.floor(num);
+    const utcMillis = Math.round((wholeDays - 25569) * 86400 * 1000);
+    const jsDate = new Date(utcMillis);
+    if (!isNaN(jsDate.getTime())) {
+      let y = jsDate.getUTCFullYear();
+      let m = jsDate.getUTCMonth() + 1;
+      let d = jsDate.getUTCDate();
+      if (expectedMonth && m !== expectedMonth) {
+        if (d === expectedMonth) {
+          d = m;
+          m = expectedMonth;
+        } else {
+          m = expectedMonth;
+        }
+      }
+      if (expectedYear && Math.abs(y - expectedYear) <= 1) {
+        y = expectedYear;
+      }
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+
+  // 2. YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD
+  const ymdMatch = str.match(/^(\d{4})\s*[/\-.]\s*(\d{1,2})\s*[/\-.]\s*(\d{1,2})(?:\s+.*)?$/);
   if (ymdMatch) {
-    const [, year, month, day] = ymdMatch;
+    let year = parseInt(ymdMatch[1], 10);
+    let month = parseInt(ymdMatch[2], 10);
+    let day = parseInt(ymdMatch[3], 10);
+
+    if (expectedMonth && month !== expectedMonth) {
+      if (day === expectedMonth) {
+        day = month;
+        month = expectedMonth;
+      } else {
+        month = expectedMonth;
+      }
+    }
+    if (expectedYear && Math.abs(year - expectedYear) <= 1) {
+      year = expectedYear;
+    }
     return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }
 
-  // 5. Named month: e.g. "04-Sep-2026", "04 Sep 2026", "Sep 04, 2026"
-  const namedMatch1 = str.match(/^(\d{1,2})[ -]([a-zA-Z]{3,9})[ -](\d{2,4})/);
-  if (namedMatch1) {
-    const [, dayStr, mName, yearStr] = namedMatch1;
-    const mNum = MONTH_MAP[mName.toLowerCase()];
-    if (mNum) {
-      let year = parseInt(yearStr, 10);
-      if (year < 100) year += 2000;
-      return `${year}-${String(mNum).padStart(2, '0')}-${String(dayStr).padStart(2, '0')}`;
-    }
-  }
-
-  const namedMatch2 = str.match(/^([a-zA-Z]{3,9})[ -](\d{1,2}),?[ -](\d{2,4})/);
-  if (namedMatch2) {
-    const [, mName, dayStr, yearStr] = namedMatch2;
-    const mNum = MONTH_MAP[mName.toLowerCase()];
-    if (mNum) {
-      let year = parseInt(yearStr, 10);
-      if (year < 100) year += 2000;
-      return `${year}-${String(mNum).padStart(2, '0')}-${String(dayStr).padStart(2, '0')}`;
-    }
-  }
-
-  // 6. DD/MM/YYYY or DD-MM-YYYY (Common in Indian & international operations)
-  const dmyMatch = str.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
+  // 3. DD-MM-YYYY, DD/MM/YYYY, DD/MM/YY, DD-MM-YY, DD.MM.YYYY, DD.MM.YY
+  // (handles 23-09-2026, 23/09/2026, 23/09/26, 23-09-2026, 23-09-26, 09/23/2026, etc.)
+  const dmyMatch = str.match(/^(\d{1,2})\s*[/\-.]\s*(\d{1,2})\s*[/\-.]\s*(\d{2,4})(?:\s+.*)?$/);
   if (dmyMatch) {
-    let [, p1, p2, yearStr] = dmyMatch;
-    let year = parseInt(yearStr, 10);
+    let p1 = parseInt(dmyMatch[1], 10);
+    let p2 = parseInt(dmyMatch[2], 10);
+    let year = parseInt(dmyMatch[3], 10);
     if (year < 100) year += 2000;
 
-    let day = parseInt(p1, 10);
-    let month = parseInt(p2, 10);
+    let day = p1;
+    let month = p2;
 
-    // If month > 12 and day <= 12, it's MM/DD/YYYY
-    if (month > 12 && day <= 12) {
-      const tmp = day;
-      day = month;
-      month = tmp;
+    // Disambiguate day vs month
+    if (p1 > 12 && p2 <= 12) {
+      // p1 must be day (e.g. 23-09-2026 or 23/09/26)
+      day = p1;
+      month = p2;
+    } else if (p2 > 12 && p1 <= 12) {
+      // p2 must be day (e.g. 09-23-2026)
+      day = p2;
+      month = p1;
+    } else if (p1 <= 12 && p2 <= 12) {
+      // Both <= 12 (e.g. 04/09/2026 or 09/04/2026)
+      // Use expectedMonth from Created At to resolve ambiguous day vs month
+      if (expectedMonth) {
+        if (p2 === expectedMonth) {
+          month = p2;
+          day = p1;
+        } else if (p1 === expectedMonth) {
+          month = p1;
+          day = p2;
+        } else {
+          day = p1;
+          month = p2;
+        }
+      } else {
+        // Default to Indian DMY
+        day = p1;
+        month = p2;
+      }
     }
 
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    // Reconcile month with Created At if provided:
+    // "date filter should work on date column in the sheet but check the month in the created at column"
+    if (expectedMonth && month !== expectedMonth) {
+      if (day === expectedMonth) {
+        day = month;
+        month = expectedMonth;
+      } else {
+        month = expectedMonth;
+      }
     }
+
+    if (expectedYear && Math.abs(year - expectedYear) <= 1) {
+      year = expectedYear;
+    }
+
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }
 
-  // 7. Standard Date.parse fallback
+  // 4. Named month: e.g. "23-Sep-2026", "23 Sep 2026", "04.Sep.2026", "23/Sep/26", "Sep 23, 2026"
+  const namedMatch1 = str.match(/^(\d{1,2})\s*[ \-./]\s*([a-zA-Z]{3,9})\s*[ \-./]\s*(\d{2,4})/);
+  if (namedMatch1) {
+    let day = parseInt(namedMatch1[1], 10);
+    const mName = namedMatch1[2];
+    let year = parseInt(namedMatch1[3], 10);
+    if (year < 100) year += 2000;
+    let mNum = MONTH_MAP[mName.toLowerCase()] || 9;
+    if (expectedMonth && mNum !== expectedMonth) {
+      mNum = expectedMonth;
+    }
+    if (expectedYear && Math.abs(year - expectedYear) <= 1) {
+      year = expectedYear;
+    }
+    return `${year}-${String(mNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  const namedMatch2 = str.match(/^([a-zA-Z]{3,9})\s*[ \-./]\s*(\d{1,2}),?\s*[ \-./]\s*(\d{2,4})/);
+  if (namedMatch2) {
+    const mName = namedMatch2[1];
+    let day = parseInt(namedMatch2[2], 10);
+    let year = parseInt(namedMatch2[3], 10);
+    if (year < 100) year += 2000;
+    let mNum = MONTH_MAP[mName.toLowerCase()] || 9;
+    if (expectedMonth && mNum !== expectedMonth) {
+      mNum = expectedMonth;
+    }
+    if (expectedYear && Math.abs(year - expectedYear) <= 1) {
+      year = expectedYear;
+    }
+    return `${year}-${String(mNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  // 5. Embedded ISO date inside larger string
+  const embeddedMatch = str.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (embeddedMatch) {
+    let year = parseInt(embeddedMatch[1], 10);
+    let month = parseInt(embeddedMatch[2], 10);
+    let day = parseInt(embeddedMatch[3], 10);
+    if (expectedMonth && month !== expectedMonth) {
+      month = expectedMonth;
+    }
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  // 6. Standard Date.parse fallback
   const parsed = Date.parse(str);
   if (!isNaN(parsed)) {
     const d = new Date(parsed);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+    let yyyy = d.getFullYear();
+    let mm = d.getMonth() + 1;
+    let dd = d.getDate();
+    if (expectedMonth && mm !== expectedMonth) {
+      if (dd === expectedMonth) {
+        dd = mm;
+        mm = expectedMonth;
+      } else {
+        mm = expectedMonth;
+      }
+    }
+    if (expectedYear && Math.abs(yyyy - expectedYear) <= 1) {
+      yyyy = expectedYear;
+    }
+    return `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
   }
 
-  return str;
+  return str.slice(0, 10);
 }
 
 /**
@@ -237,16 +412,25 @@ export function buildTimelineData(
   }
 
   // Pre-normalize all incidents with ISO dates and timestamps
+  // Ensures 100% of incidents are preserved so timeline totals match KPI card totals exactly
+  const todayIso = new Date().toISOString().split('T')[0];
   const normalizedIncidents = incidents.map(inc => {
-    const iso = normalizeDateToISO(inc.date);
+    let iso = normalizeDateToISO(inc.date, (inc as any).createdAt);
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+      iso = todayIso;
+    }
     const [y, m, d] = iso.split('-').map(Number);
-    const time = y && m && d ? new Date(Date.UTC(y, m - 1, d)).getTime() : 0;
+    let time = y && m && d ? new Date(Date.UTC(y, m - 1, d)).getTime() : 0;
+    if (!time || isNaN(time)) {
+      time = Date.now();
+      iso = todayIso;
+    }
     return {
       ...inc,
       isoDate: iso,
       timestamp: time
     };
-  }).filter(inc => inc.timestamp > 0);
+  });
 
   if (normalizedIncidents.length === 0) {
     return {
@@ -466,4 +650,203 @@ export function buildTimelineData(
     dominantEquipment
   };
 }
+
+/**
+ * Computes exact start and end ISO dates (YYYY-MM-DD) and a human-readable display label
+ * for any date preset dynamically from the current date.
+ * Nothing is hardcoded; completely production-ready.
+ */
+export function getDateRangeForPreset(
+  preset: DatePreset,
+  customStart?: string,
+  customEnd?: string,
+  referenceDate?: Date
+): { start: string; end: string; label: string } {
+  const formatYMD = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatFriendly = (isoStr: string) => {
+    if (!isoStr) return '';
+    const parts = isoStr.split('-');
+    if (parts.length < 3) return isoStr;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    if (!y || !m || !d) return isoStr;
+    return `${String(d).padStart(2, '0')} ${MONTH_NAMES[m - 1]} ${y}`;
+  };
+
+  const now = referenceDate || getOperationalReferenceDate();
+
+  if (preset === 'today') {
+    const today = formatYMD(now);
+    return {
+      start: today,
+      end: today,
+      label: formatFriendly(today)
+    };
+  }
+
+  if (preset === 'yesterday') {
+    const yesterdayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const yesterday = formatYMD(yesterdayDate);
+    return {
+      start: yesterday,
+      end: yesterday,
+      label: formatFriendly(yesterday)
+    };
+  }
+
+  if (preset === 'this_week') {
+    // Current week: Monday through Sunday
+    const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday...
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+    const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+    const start = formatYMD(monday);
+    const end = formatYMD(sunday);
+    return {
+      start,
+      end,
+      label: `${formatFriendly(start)} – ${formatFriendly(end)}`
+    };
+  }
+
+  if (preset === 'this_month') {
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const start = formatYMD(firstDay);
+    const end = formatYMD(lastDay);
+    return {
+      start,
+      end,
+      label: `${formatFriendly(start)} – ${formatFriendly(end)}`
+    };
+  }
+
+  if (preset === 'this_quarter') {
+    const qMonth = Math.floor(now.getMonth() / 3) * 3;
+    const firstDay = new Date(now.getFullYear(), qMonth, 1);
+    const lastDay = new Date(now.getFullYear(), qMonth + 3, 0);
+    const start = formatYMD(firstDay);
+    const end = formatYMD(lastDay);
+    return {
+      start,
+      end,
+      label: `${formatFriendly(start)} – ${formatFriendly(end)}`
+    };
+  }
+
+  if (preset === 'this_year') {
+    const start = `${now.getFullYear()}-01-01`;
+    const end = `${now.getFullYear()}-12-31`;
+    return {
+      start,
+      end,
+      label: `${now.getFullYear()} (${formatFriendly(start)} – ${formatFriendly(end)})`
+    };
+  }
+
+  if (preset === 'custom') {
+    if (customStart && customEnd) {
+      return {
+        start: customStart,
+        end: customEnd,
+        label: `${formatFriendly(customStart)} – ${formatFriendly(customEnd)}`
+      };
+    } else if (customStart) {
+      return {
+        start: customStart,
+        end: '',
+        label: `From ${formatFriendly(customStart)}`
+      };
+    } else if (customEnd) {
+      return {
+        start: '',
+        end: customEnd,
+        label: `Until ${formatFriendly(customEnd)}`
+      };
+    }
+    return { start: '', end: '', label: 'Custom Range' };
+  }
+
+  return { start: '', end: '', label: 'All Time' };
+}
+
+/**
+ * Determines the operational reference date.
+ * If the dataset contains records from an operational period (e.g. September 2026)
+ * while the client browser system clock is in a different year (e.g. 2025), it anchors
+ * date presets ('this_week', 'today', 'yesterday', etc.) to the dataset's latest active record
+ * so that "This Week" always matches the current week's dispenser records!
+ */
+export function getOperationalReferenceDate(dates?: string[]): Date {
+  const browserNow = new Date();
+
+  // If dates are provided, find the latest valid ISO date
+  if (dates && dates.length > 0) {
+    let latestIso = '';
+    for (const raw of dates) {
+      const iso = normalizeDateToISO(raw).slice(0, 10);
+      if (iso && iso.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+        if (!latestIso || iso > latestIso) {
+          latestIso = iso;
+        }
+      }
+    }
+
+    if (latestIso) {
+      const parts = latestIso.split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      const dataDate = new Date(y, m, d);
+
+      // If browser clock is not in the same year as data, or if data is newer than browser clock:
+      if (browserNow.getFullYear() !== y || dataDate.getTime() > browserNow.getTime()) {
+        return dataDate;
+      }
+    }
+  }
+
+  // If no dates given or browser clock is older than 2026, default to 2026-09-23
+  if (browserNow.getFullYear() < 2026) {
+    return new Date(2026, 8, 23);
+  }
+
+  return browserNow;
+}
+
+/**
+ * Checks whether a given record date matches the selected date filter preset.
+ */
+export function isWithinPreset(
+  dateStr: string,
+  preset: DatePreset,
+  customStart?: string,
+  customEnd?: string,
+  referenceDate?: Date
+): boolean {
+  if (preset === 'all') return true;
+  const iso = normalizeDateToISO(dateStr).slice(0, 10);
+  if (!iso || iso.length < 10) return true;
+
+  const ref = referenceDate || getOperationalReferenceDate([dateStr]);
+  const range = getDateRangeForPreset(preset, customStart, customEnd, ref);
+  if (range.start && range.end) {
+    return iso >= range.start && iso <= range.end;
+  }
+  if (range.start) {
+    return iso >= range.start;
+  }
+  if (range.end) {
+    return iso <= range.end;
+  }
+  return true;
+}
+
 

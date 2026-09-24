@@ -676,7 +676,7 @@ export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
                             <div>{inc.entityName}</div>
                             <div className="text-[10px] text-slate-400 font-mono font-normal">{inc.assetIdentifier}</div>
                           </td>
-                          <td className="py-2.5 px-3 text-slate-700">
+                          <td className="py-2.5 px-3 text-slate-700 break-words whitespace-normal min-w-[200px] max-w-sm leading-snug">
                             {inc.problem}
                           </td>
                           <td className="py-2.5 px-3 text-center">

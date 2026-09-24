@@ -11,14 +11,14 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 
-export type DashboardNavTab = 'overview' | 'zones' | 'engineers' | 'customers';
+export type DashboardNavTab = 'overview' | 'zones' | 'engineers';
 
 interface SidebarProps {
   activeTab: DashboardNavTab;
   onSelectTab: (tab: DashboardNavTab) => void;
   openTicketsCount: number;
   totalComplaintsCount: number;
-  compressorCount: number;
+  compressorCount?: number;
   dispenserCount: number;
   engineerCount?: number;
   onCloseMobile?: () => void;
@@ -30,7 +30,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   openTicketsCount,
   totalComplaintsCount,
-  compressorCount,
   dispenserCount,
   engineerCount,
   onCloseMobile,
@@ -47,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: 'overview',
       label: 'Operations Overview',
-      description: 'Dual-sheet unified KPI dashboard',
+      description: 'Dispenser operations KPI dashboard',
       icon: LayoutDashboard,
       badge: `${totalComplaintsCount} Logs`,
       badgeColor: 'bg-slate-100 text-slate-700'
@@ -67,14 +66,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Users,
       badge: `${engineerCount ?? 7} Techs`,
       badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-100'
-    },
-    {
-      id: 'customers',
-      label: 'Customer Analysis',
-      description: 'Compressor account lifecycle & AMC',
-      icon: Building2,
-      badge: `${compressorCount} Assets`,
-      badgeColor: 'bg-blue-50 text-blue-700 border-blue-100'
     }
   ];
 
@@ -138,17 +129,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-3">
           <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
             <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600" />
-            Active Data Sources
+            Active Data Source
           </div>
           
           <div className="space-y-2 text-xs">
-            <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200/60 shadow-2xs">
-              <span className="font-semibold text-slate-800">Sheet 1: Compressor</span>
-              <span className="text-indigo-600 font-bold">{compressorCount} logs</span>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200/60 shadow-2xs">
-              <span className="font-semibold text-slate-800">Sheet 2: Dispenser</span>
-              <span className="text-emerald-600 font-bold">{dispenserCount} logs</span>
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200/60 shadow-2xs">
+              <div>
+                <span className="font-semibold text-slate-800 block">Dispenser Operations</span>
+                <span className="text-[10px] text-slate-400">Google Sheets Sync</span>
+              </div>
+              <span className="text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                {dispenserCount} complaints
+              </span>
             </div>
           </div>
         </div>

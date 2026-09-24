@@ -278,10 +278,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           <ul className="space-y-1.5 text-xs text-slate-600">
             <li className="flex items-center gap-2">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span>Dual-Sheet sync: Compressor & Dispenser fleets</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
               <span>Real-time engineer MTTR and SLA performance</span>
             </li>
             <li className="flex items-center gap-2">

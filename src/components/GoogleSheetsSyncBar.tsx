@@ -99,37 +99,25 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
                 )}
                 {isAuthenticated && (
                   <span className="text-slate-400 font-mono">
-                    &bull; {compressorRowCount} Comp / {dispenserRowCount} Disp
+                    &bull; {dispenserRowCount} Dispenser Records
                   </span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Quick links to both spreadsheets */}
+          {/* Quick link to Dispenser spreadsheet */}
           <div className="hidden xl:flex items-center gap-2 pl-3 border-l border-slate-200">
-            <a
-              href={`https://docs.google.com/spreadsheets/d/${COMPRESSOR_SPREADSHEET_ID}/edit`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-medium transition-colors"
-              title="Open Compressor Google Sheet"
-            >
-              <Database className="w-3 h-3 text-indigo-600" />
-              <span>Compressor Sheet</span>
-              <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
-            </a>
-
             <a
               href={`https://docs.google.com/spreadsheets/d/${DISPENSER_SPREADSHEET_ID}/edit`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-medium transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200 text-[11px] font-semibold transition-colors"
               title="Open Dispenser Google Sheet"
             >
               <Database className="w-3 h-3 text-emerald-600" />
-              <span>Dispenser Sheet</span>
-              <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
+              <span>Dispenser Google Sheet</span>
+              <ExternalLink className="w-2.5 h-2.5 text-emerald-600" />
             </a>
           </div>
         </div>
@@ -334,42 +322,13 @@ export const GoogleSheetsSyncBar: React.FC<GoogleSheetsSyncBarProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Compressor Sheet Card */}
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <Database className="w-3.5 h-3.5 text-indigo-600" />
-                  Sheet 1: Compressor Records
-                </span>
-                <span className="font-semibold text-indigo-600 font-mono text-[11px]">
-                  {compressorRowCount} rows loaded
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-500 font-mono break-all">
-                ID: {COMPRESSOR_SPREADSHEET_ID}
-              </div>
-              {compressorSheetTitle && (
-                <div className="text-[11px] text-slate-600">
-                  Active Tab: <span className="font-semibold">{compressorSheetTitle}</span>
-                </div>
-              )}
-              <a
-                href={`https://docs.google.com/spreadsheets/d/${COMPRESSOR_SPREADSHEET_ID}/edit`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center gap-1 mt-1"
-              >
-                Open in Google Sheets <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-
+          <div className="grid grid-cols-1 gap-3">
             {/* Dispenser Sheet Card */}
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-slate-800 flex items-center gap-1.5">
                   <Database className="w-3.5 h-3.5 text-emerald-600" />
-                  Sheet 2: Dispenser Records
+                  Dispenser Google Sheet Records
                 </span>
                 <span className="font-semibold text-emerald-600 font-mono text-[11px]">
                   {dispenserRowCount} rows loaded

@@ -2,13 +2,14 @@ export type TicketStatus = 'Open' | 'In Progress' | 'Closed';
 export type EquipmentType = 'All' | 'Compressor' | 'Dispenser';
 export type ViewMode = 'both' | 'graphical' | 'tabular';
 
-export type DatePreset = 'all' | 'today' | 'this_week' | 'this_month' | 'this_quarter' | 'this_year' | 'custom';
+export type DatePreset = 'all' | 'today' | 'yesterday' | 'this_week' | 'this_month' | 'this_quarter' | 'this_year' | 'custom';
 
 // Sheet 1: Compressor Data Columns
 // Date, Customer Name, Area, Model, Serial Number, Problem, Contract, Support Engineer, WhatsApp Message ID, Sender Number
 export interface CompressorRecord {
   id: string;
   date: string; // YYYY-MM-DD
+  createdAt?: string; // Standard ISO or timestamp
   customerName: string;
   area: string; // Area / Zone
   model: string;
@@ -28,9 +29,10 @@ export interface CompressorRecord {
 export interface DispenserSheetRecord {
   id: string;
   date: string; // YYYY-MM-DD
+  createdAt?: string; // Standard ISO or timestamp (priority for date filters)
   stationName: string;
   dispenserSerialNo: string;
-  typeOfService: 'Breakdown' | 'Preventive Maintenance' | 'Calibration' | 'Inspection' | 'Emergency Callout';
+  typeOfService: 'BM' | 'PM' | 'Breakdown' | 'Preventive Maintenance' | string;
   complaintTime: string;
   reachTime: string;
   closeTime: string; // e.g. "16:45" or "-" if still open
@@ -49,6 +51,7 @@ export interface UnifiedIncidentRecord {
   id: string;
   equipmentType: 'Compressor' | 'Dispenser';
   date: string;
+  createdAt?: string; // Created at date / timestamp
   entityName: string; // Customer Name (Compressor) or Station Name (Dispenser)
   zoneOrArea: string;
   assetIdentifier: string; // Model/Serial No
@@ -69,10 +72,14 @@ export interface DashboardFilters {
   endDate: string;
   zones: string[]; // multi-select
   engineers: string[]; // multi-select
+  problems?: string[]; // multi-select
   status: 'All' | 'Open' | 'Closed';
   equipmentType: EquipmentType;
   viewMode: ViewMode;
   searchQuery: string;
+  dispenserServiceType?: string;
+  dispenserStation?: string;
+  dispenserSerialNo?: string;
 }
 
 export interface CustomerMetric {

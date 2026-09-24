@@ -533,7 +533,7 @@ export const IndiaZoneMap: React.FC<IndiaZoneMapProps> = ({
                   </div>
                   <div className="mt-1.5 text-[11px] text-slate-300 space-y-0.5">
                     <div>Territory: <strong className="text-white">{hoveredHub.zone}</strong></div>
-                    <div>Active Stations: <strong className="text-white">{hoveredHub.stationCount} Units</strong></div>
+                    <div>No. of Stations: <strong className="text-white">{hoveredHub.stationCount} Units</strong></div>
                     <div>Focus: <strong className="text-indigo-300">{hoveredHub.equipmentFocus}</strong></div>
                   </div>
                 </div>

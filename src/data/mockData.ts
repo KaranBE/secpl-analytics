@@ -8,13 +8,77 @@ import {
   CustomerMetric,
   UnifiedIncidentRecord
 } from '../types';
-import { cleanEngineerName } from '../utils/cleanUtils';
+import { cleanEngineerName, cleanSerialNumber, cleanServiceType, containsDateAndStation, containsNumberedItem10, extractProblemFromTextOrRawMessage, isValidProblemDescription, cleanProblemDescription, cleanActionTakenFromProblem, extractEngineerFromTextOrRawMessage } from '../utils/cleanUtils';
+import { normalizeDateToISO } from '../utils/dateUtils';
 
 // =========================================================================
 // SHEET 1: COMPRESSOR DATA
 // Exact columns: Date, Customer Name, Area, Model, Serial Number, Problem, Contract, Support Engineer, WhatsApp Message ID, Sender Number
 // =========================================================================
 export const COMPRESSOR_DATA: CompressorRecord[] = [
+  {
+    id: 'CMP-100A',
+    date: '2026-09-24',
+    customerName: 'Tata Motors Assembly Plant',
+    area: 'West Zone',
+    model: 'AtlasCopco GA-37 VSD',
+    serialNumber: 'CMP-SN-9081',
+    problem: 'High Discharge Temp',
+    contract: 'Comprehensive AMC',
+    supportEngineer: 'Vishal Joshi',
+    whatsappMessageId: 'wamid.HBgMOTE5ODIzMTQ0NTFBA01==',
+    senderNumber: '+91 98231 44510',
+    status: 'In Progress',
+    notes: 'Thermostatic valve inspected; replacement cartridge requested.'
+  },
+  {
+    id: 'CMP-100B',
+    date: '2026-09-23',
+    customerName: 'Apollo Hospitals Central',
+    area: 'South Zone',
+    model: 'IngersollRand R-Series 55kW',
+    serialNumber: 'CMP-SN-4412',
+    problem: 'Air Pressure Drop',
+    contract: 'Comprehensive AMC',
+    supportEngineer: 'Amit Sharma',
+    whatsappMessageId: 'wamid.HBgMOTE5ODg0MDE5MjgxA02==',
+    senderNumber: '+91 98840 19283',
+    status: 'Closed',
+    resolutionTimeHours: 1.2,
+    notes: 'Airline coupling o-ring replaced.'
+  },
+  {
+    id: 'CMP-100C',
+    date: '2026-09-22',
+    customerName: 'Bosch Automotive Hub',
+    area: 'South Zone',
+    model: 'Kaeser CSDX 140',
+    serialNumber: 'CMP-SN-1109',
+    problem: 'Oil Filter Clogged',
+    contract: 'Comprehensive AMC',
+    supportEngineer: 'Amit Sharma',
+    whatsappMessageId: 'wamid.HBgMOTE5NzQxMDg4MjMxA03==',
+    senderNumber: '+91 97410 88231',
+    status: 'Closed',
+    resolutionTimeHours: 1.8,
+    notes: 'Primary spin-on oil filter cartridge replaced.'
+  },
+  {
+    id: 'CMP-100D',
+    date: '2026-09-21',
+    customerName: 'Hero MotoCorp Plant 2',
+    area: 'North Zone',
+    model: 'AtlasCopco GA-55 VSD',
+    serialNumber: 'CMP-SN-2245',
+    problem: 'Motor Overload Trip',
+    contract: 'Comprehensive AMC',
+    supportEngineer: 'Sunil Kumar',
+    whatsappMessageId: 'wamid.HBgMOTE5ODI4MDExOTI1A04==',
+    senderNumber: '+91 98280 11925',
+    status: 'Closed',
+    resolutionTimeHours: 2.1,
+    notes: 'Overload relay recalibrated.'
+  },
   {
     id: 'CMP-101',
     date: '2026-09-04',
@@ -278,11 +342,153 @@ export const COMPRESSOR_DATA: CompressorRecord[] = [
 // =========================================================================
 export const DISPENSER_DATA: DispenserSheetRecord[] = [
   {
+    id: 'DSP-200A',
+    date: '2026-09-24',
+    stationName: 'IOCL Green Park Station',
+    dispenserSerialNo: 'DSP-SN-7721',
+    typeOfService: 'BM',
+    complaintTime: '08:45 AM',
+    reachTime: '09:20 AM',
+    closeTime: '-',
+    zoneName: 'West Zone',
+    serviceEngineerName: 'Vishal Joshi',
+    problem: 'Nozzle Auto-Cut Failure',
+    whatsappMessageId: 'wamid.HBgMOTE5ODIzMTQ0NTFBAA01==',
+    senderNumber: '+91 98231 44510',
+    status: 'In Progress',
+    responseTimeMinutes: 35
+  },
+  {
+    id: 'DSP-200B',
+    date: '2026-09-23',
+    stationName: 'HPCL Airport Highway Hub',
+    dispenserSerialNo: 'DSP-SN-3310',
+    typeOfService: 'PM',
+    complaintTime: '09:15 AM',
+    reachTime: '09:45 AM',
+    closeTime: '11:15 AM',
+    zoneName: 'South Zone',
+    serviceEngineerName: 'Amit Sharma',
+    problem: 'Flow Meter Calibration & Filter Check',
+    whatsappMessageId: 'wamid.HBgMOTE5ODg0MDE5MjgxA02==',
+    senderNumber: '+91 98840 19283',
+    status: 'Closed',
+    responseTimeMinutes: 30,
+    resolutionTimeHours: 2.0
+  },
+  {
+    id: 'DSP-200C',
+    date: '2026-09-22',
+    stationName: 'BPCL Connaught Place Point',
+    dispenserSerialNo: 'DSP-SN-8942',
+    typeOfService: 'PM',
+    complaintTime: '10:30 AM',
+    reachTime: '11:00 AM',
+    closeTime: '12:45 PM',
+    zoneName: 'North Zone',
+    serviceEngineerName: 'Sunil Kumar',
+    problem: 'Preset Volume Discrepancy',
+    whatsappMessageId: 'wamid.HBgMOTE5ODI4MDExOTI1A03==',
+    senderNumber: '+91 98280 11925',
+    status: 'Closed',
+    responseTimeMinutes: 30,
+    resolutionTimeHours: 1.75
+  },
+  {
+    id: 'DSP-200D',
+    date: '2026-09-21',
+    stationName: 'Shell Outer Ring Road Outlet',
+    dispenserSerialNo: 'DSP-SN-1102',
+    typeOfService: 'BM',
+    complaintTime: '07:15 AM',
+    reachTime: '07:40 AM',
+    closeTime: '08:55 AM',
+    zoneName: 'South Zone',
+    serviceEngineerName: 'Amit Sharma',
+    problem: 'Solenoid Valve Leakage',
+    whatsappMessageId: 'wamid.HBgMOTE5NzQxMDg4MjMxA04==',
+    senderNumber: '+91 97410 88231',
+    status: 'Closed',
+    responseTimeMinutes: 25,
+    resolutionTimeHours: 1.25
+  },
+  {
+    id: 'DSP-200E',
+    date: '2026-09-24',
+    stationName: 'Torrent Gas Daughter Station',
+    dispenserSerialNo: 'DSP-SN-5529',
+    typeOfService: 'BM',
+    complaintTime: '09:00 AM',
+    reachTime: '09:35 AM',
+    closeTime: '-',
+    zoneName: 'North Zone',
+    serviceEngineerName: 'Rahul Verma',
+    problem: 'Display Backlight Glitch',
+    whatsappMessageId: 'wamid.HBgMOTE5NjExOTkyODAxA05==',
+    senderNumber: '+91 96119 92801',
+    status: 'In Progress',
+    responseTimeMinutes: 35
+  },
+  {
+    id: 'DSP-200F',
+    date: '2026-09-23',
+    stationName: 'Adani Total Gas CGD Hub',
+    dispenserSerialNo: 'DSP-SN-6641',
+    typeOfService: 'PM',
+    complaintTime: '11:15 AM',
+    reachTime: '11:45 AM',
+    closeTime: '01:20 PM',
+    zoneName: 'Central Zone',
+    serviceEngineerName: 'Vikram Rao',
+    problem: 'Preventive Flow Calibration & Filter Service',
+    whatsappMessageId: 'wamid.HBgMOTE5ODExMjkzODQyA06==',
+    senderNumber: '+91 98112 93842',
+    status: 'Closed',
+    responseTimeMinutes: 30,
+    resolutionTimeHours: 1.6
+  },
+  {
+    id: 'DSP-200G',
+    date: '2026-09-22',
+    stationName: 'Reliance Retail Petroleum Outlet',
+    dispenserSerialNo: 'DSP-SN-2281',
+    typeOfService: 'BM',
+    complaintTime: '02:20 PM',
+    reachTime: '02:50 PM',
+    closeTime: '04:15 PM',
+    zoneName: 'East Zone',
+    serviceEngineerName: 'Priya Nair',
+    problem: 'Pulse Generator Error',
+    whatsappMessageId: 'wamid.HBgMOTE5ODk5MjM4MTIxA07==',
+    senderNumber: '+91 98992 38121',
+    status: 'Closed',
+    responseTimeMinutes: 30,
+    resolutionTimeHours: 1.4
+  },
+  {
+    id: 'DSP-200H',
+    date: '2026-09-21',
+    stationName: 'MGL CNG Mother Station',
+    dispenserSerialNo: 'DSP-SN-9944',
+    typeOfService: 'PM',
+    complaintTime: '03:10 PM',
+    reachTime: '03:40 PM',
+    closeTime: '05:30 PM',
+    zoneName: 'West Zone',
+    serviceEngineerName: 'Vishal Joshi',
+    problem: 'Pressure Regulator Calibration',
+    whatsappMessageId: 'wamid.HBgMOTE5ODIzMTQ0NTFBA08==',
+    senderNumber: '+91 98231 44510',
+    status: 'Closed',
+    responseTimeMinutes: 30,
+    resolutionTimeHours: 1.8
+  },
+  {
     id: 'DSP-201',
     date: '2026-09-04',
     stationName: 'IOCL Green Park Station',
     dispenserSerialNo: 'DSP-SN-7721',
-    typeOfService: 'Breakdown',
+    typeOfService: 'BM',
     complaintTime: '08:45 AM',
     reachTime: '09:20 AM',
     closeTime: '-',
@@ -299,7 +505,7 @@ export const DISPENSER_DATA: DispenserSheetRecord[] = [
     date: '2026-09-04',
     stationName: 'HPCL Airport Highway Hub',
     dispenserSerialNo: 'DSP-SN-3310',
-    typeOfService: 'Breakdown',
+    typeOfService: 'BM',
     complaintTime: '09:15 AM',
     reachTime: '09:45 AM',
     closeTime: '11:15 AM',
@@ -317,7 +523,7 @@ export const DISPENSER_DATA: DispenserSheetRecord[] = [
     date: '2026-09-03',
     stationName: 'BPCL Ring Road Retail',
     dispenserSerialNo: 'DSP-SN-8842',
-    typeOfService: 'Calibration',
+    typeOfService: 'PM',
     complaintTime: '10:30 AM',
     reachTime: '11:05 AM',
     closeTime: '12:35 PM',
@@ -335,7 +541,7 @@ export const DISPENSER_DATA: DispenserSheetRecord[] = [
     date: '2026-09-03',
     stationName: 'Shell Outer Ring Plaza',
     dispenserSerialNo: 'DSP-SN-1093',
-    typeOfService: 'Breakdown',
+    typeOfService: 'B.M.',
     complaintTime: '11:00 AM',
     reachTime: '11:28 AM',
     closeTime: '01:05 PM',
@@ -353,7 +559,7 @@ export const DISPENSER_DATA: DispenserSheetRecord[] = [
     date: '2026-09-02',
     stationName: 'Nayara Energy South Depot',
     dispenserSerialNo: 'DSP-SN-6450',
-    typeOfService: 'Preventive Maintenance',
+    typeOfService: 'P.m',
     complaintTime: '01:15 PM',
     reachTime: '01:50 PM',
     closeTime: '03:40 PM',
@@ -371,7 +577,7 @@ export const DISPENSER_DATA: DispenserSheetRecord[] = [
     date: '2026-09-02',
     stationName: 'IndianOil Cyber City Station',
     dispenserSerialNo: 'DSP-SN-9912',
-    typeOfService: 'Breakdown',
+    typeOfService: 'B.m',
     complaintTime: '02:40 PM',
     reachTime: '03:10 PM',
     closeTime: '04:30 PM',
@@ -389,7 +595,7 @@ export const DISPENSER_DATA: DispenserSheetRecord[] = [
     date: '2026-09-01',
     stationName: 'HPCL City Center Point',
     dispenserSerialNo: 'DSP-SN-4138',
-    typeOfService: 'Breakdown',
+    typeOfService: 'b.m.',
     complaintTime: '03:20 PM',
     reachTime: '03:52 PM',
     closeTime: '05:10 PM',
@@ -407,7 +613,7 @@ export const DISPENSER_DATA: DispenserSheetRecord[] = [
     date: '2026-08-29',
     stationName: 'IOCL Green Park Station',
     dispenserSerialNo: 'DSP-SN-7721',
-    typeOfService: 'Preventive Maintenance',
+    typeOfService: 'P.M.',
     complaintTime: '09:00 AM',
     reachTime: '09:30 AM',
     closeTime: '11:45 AM',
@@ -425,7 +631,7 @@ export const DISPENSER_DATA: DispenserSheetRecord[] = [
     date: '2026-08-25',
     stationName: 'BPCL Industrial Area Fueling',
     dispenserSerialNo: 'DSP-SN-5520',
-    typeOfService: 'Breakdown',
+    typeOfService: 'BM',
     complaintTime: '10:10 AM',
     reachTime: '10:42 AM',
     closeTime: '12:20 PM',
@@ -443,7 +649,7 @@ export const DISPENSER_DATA: DispenserSheetRecord[] = [
     date: '2026-08-18',
     stationName: 'Shell Outer Ring Plaza',
     dispenserSerialNo: 'DSP-SN-1093',
-    typeOfService: 'Emergency Callout',
+    typeOfService: 'BM',
     complaintTime: '04:00 PM',
     reachTime: '04:25 PM',
     closeTime: '06:10 PM',
@@ -461,7 +667,7 @@ export const DISPENSER_DATA: DispenserSheetRecord[] = [
     date: '2026-07-22',
     stationName: 'HPCL Airport Highway Hub',
     dispenserSerialNo: 'DSP-SN-3310',
-    typeOfService: 'Calibration',
+    typeOfService: 'PM',
     complaintTime: '11:15 AM',
     reachTime: '11:45 AM',
     closeTime: '01:30 PM',
@@ -479,7 +685,7 @@ export const DISPENSER_DATA: DispenserSheetRecord[] = [
     date: '2026-06-15',
     stationName: 'IndianOil Cyber City Station',
     dispenserSerialNo: 'DSP-SN-9912',
-    typeOfService: 'Breakdown',
+    typeOfService: 'BM',
     complaintTime: '08:30 AM',
     reachTime: '09:05 AM',
     closeTime: '11:00 AM',
@@ -495,63 +701,86 @@ export const DISPENSER_DATA: DispenserSheetRecord[] = [
 ];
 
 // Helper to get unified incident list
+// Defaults to onlyDispenser = true per current requirement: "hide compressor data, only dispenser data for now"
 export function getUnifiedIncidents(
   compressors: CompressorRecord[] = COMPRESSOR_DATA,
-  dispensers: DispenserSheetRecord[] = DISPENSER_DATA
+  dispensers: DispenserSheetRecord[] = DISPENSER_DATA,
+  onlyDispenser: boolean = true
 ): UnifiedIncidentRecord[] {
   const unified: UnifiedIncidentRecord[] = [];
 
-  compressors.forEach(c => {
-    unified.push({
-      id: c.id,
-      equipmentType: 'Compressor',
-      date: c.date,
-      entityName: c.customerName,
-      zoneOrArea: c.area,
-      assetIdentifier: `${c.model} (${c.serialNumber})`,
-      problem: c.problem,
-      engineer: c.supportEngineer,
-      status: c.status,
-      whatsappMessageId: c.whatsappMessageId,
-      senderNumber: c.senderNumber,
-      contractOrServiceType: c.contract,
-      resolutionTimeHours: c.resolutionTimeHours || 1.8,
-      notes: c.notes
+  if (!onlyDispenser && compressors && compressors.length > 0) {
+    compressors.forEach(c => {
+      unified.push({
+        id: c.id,
+        equipmentType: 'Compressor',
+        date: normalizeDateToISO(c.date, c.createdAt),
+        createdAt: normalizeDateToISO(c.createdAt || c.date),
+        entityName: c.customerName,
+        zoneOrArea: c.area,
+        assetIdentifier: `${c.model} (${cleanSerialNumber(c.serialNumber) || c.serialNumber})`,
+        problem: c.problem,
+        engineer: c.supportEngineer,
+        status: c.status,
+        whatsappMessageId: c.whatsappMessageId,
+        senderNumber: c.senderNumber,
+        contractOrServiceType: c.contract,
+        resolutionTimeHours: c.resolutionTimeHours || 1.8,
+        notes: c.notes
+      });
     });
-  });
+  }
 
   dispensers.forEach(d => {
-    // Ensure problem description never shows a raw timestamp/clock time
-    let cleanProblem = d.problem;
-    if (!cleanProblem || /^\d{1,2}[:.]\d{2}([:.]\d{2})?\s*(am|pm)?$/i.test(cleanProblem.trim())) {
-      cleanProblem = d.typeOfService === 'Breakdown'
-        ? 'Dispenser Breakdown'
-        : d.typeOfService === 'Preventive Maintenance'
-          ? 'Preventive Maintenance'
-          : d.typeOfService === 'Calibration'
-            ? 'Flow Meter Calibration Check'
-            : `${d.typeOfService} Service`;
+    const sType = cleanServiceType(d.typeOfService);
+    let cleanProblem = cleanActionTakenFromProblem(d.problem) || d.problem;
+    if (
+      !cleanProblem ||
+      containsDateAndStation(cleanProblem, d.stationName) ||
+      containsNumberedItem10(cleanProblem) ||
+      !isValidProblemDescription(cleanProblem, d.stationName)
+    ) {
+      const extracted = extractProblemFromTextOrRawMessage(
+        cleanProblem,
+        d.whatsappMessageId,
+        d.stationName,
+        d.serviceEngineerName
+      );
+      cleanProblem = extracted || cleanProblemDescription(cleanProblem, sType, d.stationName, d.whatsappMessageId, d.serviceEngineerName);
     }
+    cleanProblem = cleanActionTakenFromProblem(cleanProblem) || cleanProblem;
+
+    const extractedEng = extractEngineerFromTextOrRawMessage(
+      d.whatsappMessageId,
+      d.problem,
+      d.serviceEngineerName
+    );
+    const assignedEng = extractedEng || cleanEngineerName(d.serviceEngineerName) || 'Unassigned';
 
     unified.push({
       id: d.id,
       equipmentType: 'Dispenser',
-      date: d.date,
+      date: normalizeDateToISO(d.date, d.createdAt),
+      createdAt: normalizeDateToISO(d.createdAt || d.date),
       entityName: d.stationName,
       zoneOrArea: d.zoneName,
-      assetIdentifier: d.dispenserSerialNo,
+      assetIdentifier: cleanSerialNumber(d.dispenserSerialNo) || d.dispenserSerialNo,
       problem: cleanProblem,
-      engineer: d.serviceEngineerName,
+      engineer: assignedEng,
       status: d.status,
       whatsappMessageId: d.whatsappMessageId,
       senderNumber: d.senderNumber,
-      contractOrServiceType: d.typeOfService,
+      contractOrServiceType: d.typeOfService || sType,
       responseTimeMinutes: d.responseTimeMinutes,
       resolutionTimeHours: d.resolutionTimeHours || 2.0
     });
   });
 
-  return unified.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return unified.sort((a, b) => {
+    const timeA = new Date(a.date).getTime() || 0;
+    const timeB = new Date(b.date).getTime() || 0;
+    return timeB - timeA;
+  });
 }
 
 // Compute Customer Metrics (ONLY COMPRESSOR)
