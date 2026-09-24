@@ -122,7 +122,7 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
     }, {} as Record<string, number>)
   ).map(([name, value]) => ({ name, value }));
 
-  // Problem breakdown in compressor dataset
+  // Problem breakdown in dataset
   const problemCounts: Record<string, number> = {};
   compressors.forEach(c => {
     problemCounts[c.problem] = (problemCounts[c.problem] || 0) + 1;
@@ -133,8 +133,8 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
 
 
 
-  const totalCompressorCalls = compressors.length;
-  const totalOpenCompressorCalls = compressors.filter(c => c.status !== 'Closed').length;
+  const totalCustomerCalls = compressors.length;
+  const totalOpenCustomerCalls = compressors.filter(c => c.status !== 'Closed').length;
 
   const showGraphical = viewMode === 'both' || viewMode === 'graphical';
   const showTabular = viewMode === 'both' || viewMode === 'tabular';
@@ -146,13 +146,13 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
         <div className="relative z-10 max-w-3xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold text-indigo-200 border border-white/10 mb-3">
             <Building2 className="w-3.5 h-3.5 text-indigo-300" />
-            <span>Dedicated Compressor Account Intelligence</span>
+            <span>Dedicated Account Intelligence</span>
           </div>
           <h2 className="text-2xl lg:text-3xl font-bold tracking-tight">
             Customer Incident & Asset Lifecycle Analysis
           </h2>
           <p className="text-indigo-200/90 text-sm mt-1 leading-relaxed">
-            Multi-dimensional analysis of industrial accounts, AMC coverage types, compressor serial health, and repeat breakdown trends across all operational zones.
+            Multi-dimensional analysis of industrial accounts, AMC coverage types, equipment serial health, and repeat breakdown trends across all operational zones.
           </p>
         </div>
 
@@ -165,18 +165,18 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
           </div>
           <div>
             <div className="text-xs text-indigo-200 font-medium">Total Service Calls</div>
-            <div className="text-2xl font-bold text-white mt-0.5">{totalCompressorCalls}</div>
-            <div className="text-[11px] text-emerald-400 font-medium">{totalCompressorCalls - totalOpenCompressorCalls} Resolved</div>
+            <div className="text-2xl font-bold text-white mt-0.5">{totalCustomerCalls}</div>
+            <div className="text-[11px] text-emerald-400 font-medium">{totalCustomerCalls - totalOpenCustomerCalls} Resolved</div>
           </div>
           <div>
             <div className="text-xs text-indigo-200 font-medium">Open Incidents</div>
-            <div className="text-2xl font-bold text-amber-300 mt-0.5">{totalOpenCompressorCalls}</div>
+            <div className="text-2xl font-bold text-amber-300 mt-0.5">{totalOpenCustomerCalls}</div>
             <div className="text-[11px] text-amber-200">Active in Field</div>
           </div>
           <div>
             <div className="text-xs text-indigo-200 font-medium">Resolution Rate</div>
             <div className="text-2xl font-bold text-emerald-300 mt-0.5">
-              {totalCompressorCalls > 0 ? Math.round(((totalCompressorCalls - totalOpenCompressorCalls) / totalCompressorCalls) * 100) : 100}%
+              {totalCustomerCalls > 0 ? Math.round(((totalCustomerCalls - totalOpenCustomerCalls) / totalCustomerCalls) * 100) : 100}%
             </div>
             <div className="text-[11px] text-emerald-200">Closure Efficiency</div>
           </div>
@@ -192,7 +192,7 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
               <div>
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-indigo-600" />
-                  Top Accounts by Compressor Incident Volume
+                  Top Accounts by Incident Volume
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Comparison of resolved vs open breakdown calls per customer account
@@ -230,7 +230,7 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
             <div>
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-1">
                 <ShieldCheck className="w-4 h-4 text-indigo-600" />
-                Compressor Contract Split
+                Service Agreement Contract Split
               </h3>
               <p className="text-xs text-slate-500 mb-3">
                 Distribution of calls by service agreement type
@@ -279,12 +279,12 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
         </div>
       )}
 
-      {/* Top Problem Categories across Compressors */}
+      {/* Top Problem Categories across Equipment */}
       {showGraphical && (
         <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-3">
             <Flame className="w-4 h-4 text-amber-500" />
-            Top Compressor Problem Breakdown Across All Customers
+            Top Problem Breakdown Across All Customers
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
             {topProblems.map((prob, idx) => (
@@ -295,13 +295,13 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
                 <div className="flex items-baseline justify-between mt-1">
                   <span className="text-lg font-bold text-slate-900">{prob.count}</span>
                   <span className="text-[10px] text-indigo-600 font-semibold">
-                    {Math.round((prob.count / (totalCompressorCalls || 1)) * 100)}%
+                    {Math.round((prob.count / (totalCustomerCalls || 1)) * 100)}%
                   </span>
                 </div>
                 <div className="w-full bg-slate-200 h-1 rounded-full mt-2 overflow-hidden">
                   <div 
                     className="bg-indigo-600 h-full rounded-full"
-                    style={{ width: `${Math.round((prob.count / (totalCompressorCalls || 1)) * 100)}%` }}
+                    style={{ width: `${Math.round((prob.count / (totalCustomerCalls || 1)) * 100)}%` }}
                   ></div>
                 </div>
               </div>
@@ -318,7 +318,7 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
             <div>
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <TableIcon className="w-4 h-4 text-indigo-600" />
-                Customer Account Master Registry (Compressor Fleet)
+                Customer Account Master Registry
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 Detailed tabular breakdown of client assets, contract SLAs, and incident history
@@ -629,9 +629,9 @@ export const CustomerAnalytics: React.FC<CustomerAnalyticsProps> = ({
               </div>
             </div>
 
-            {/* Compressor Records for this Customer */}
+            {/* Service Records for this Customer */}
             <div>
-              <h4 className="text-xs font-bold text-slate-900 mb-2">Logged Compressor Service Incidents</h4>
+              <h4 className="text-xs font-bold text-slate-900 mb-2">Logged Service Incidents</h4>
               <div className="space-y-2">
                 {compressors
                   .filter(c => c.customerName === selectedCustomer.customerName)

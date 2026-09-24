@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   UnifiedIncidentRecord, 
-  CompressorRecord, 
   DispenserSheetRecord, 
   ZoneMetric, 
   EngineerMetric, 
@@ -58,7 +57,7 @@ import {
 
 interface OverviewDashboardProps {
   incidents: UnifiedIncidentRecord[];
-  compressors: CompressorRecord[];
+  compressors?: any[];
   dispensers: DispenserSheetRecord[];
   zoneMetrics: ZoneMetric[];
   engineerMetrics: EngineerMetric[];
@@ -382,7 +381,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   Filtering Master Registry by timeline bucket:{' '}
                   <strong className="font-semibold">{selectedTimelineBucket.fullDate}</strong> &mdash;{' '}
                   <span className="font-semibold text-indigo-700 font-mono">{filteredTableIncidents.length} incidents</span>{' '}
-                  ({selectedTimelineBucket.compressor} Compressor, {selectedTimelineBucket.dispenser} Dispenser)
+                  ({selectedTimelineBucket.incidentsCount} service records)
                 </span>
               </div>
               <button
@@ -579,10 +578,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl space-y-4 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  selectedIncident.equipmentType === 'Compressor' ? 'bg-blue-100 text-blue-800' : 'bg-teal-100 text-teal-800'
-                }`}>
-                  {selectedIncident.equipmentType} Log
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800">
+                  {selectedIncident.contractOrServiceType || 'Dispenser Log'}
                 </span>
                 <h3 className="text-lg font-bold text-slate-900 mt-1">{selectedIncident.entityName}</h3>
                 <p className="text-xs text-slate-500">{selectedIncident.zoneOrArea} &bull; {selectedIncident.date}</p>

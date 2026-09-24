@@ -196,20 +196,24 @@ export const IndiaZoneMap: React.FC<IndiaZoneMapProps> = ({
   const activeZoneName = hoveredZoneName || selectedZone?.zone || null;
   const activeZoneObj = activeZoneName ? zoneDataMap[activeZoneName] : null;
 
-  // Equipment breakdown for active zone
+  // Service type breakdown for active zone
   const activeZoneEquip = useMemo(() => {
     if (!activeZoneName) return null;
     const zoneIncidents = incidents.filter(i => i.zone === activeZoneName);
-    const compCount = zoneIncidents.filter(i => (i.equipmentType || '').toLowerCase().includes('compressor')).length;
-    const dispCount = zoneIncidents.filter(i => (i.equipmentType || '').toLowerCase().includes('dispenser')).length;
-    const otherCount = zoneIncidents.length - compCount - dispCount;
+    const bmCount = zoneIncidents.filter(i => {
+      const t = (i.contractOrServiceType || '').toLowerCase();
+      return t.includes('bm') || t.includes('breakdown');
+    }).length;
+    const pmCount = zoneIncidents.filter(i => {
+      const t = (i.contractOrServiceType || '').toLowerCase();
+      return t.includes('pm') || t.includes('preventive') || t.includes('amc');
+    }).length;
     return {
       total: zoneIncidents.length,
-      compCount,
-      dispCount,
-      otherCount,
-      compPct: zoneIncidents.length > 0 ? Math.round((compCount / zoneIncidents.length) * 100) : 0,
-      dispPct: zoneIncidents.length > 0 ? Math.round((dispCount / zoneIncidents.length) * 100) : 0
+      bmCount,
+      pmCount,
+      bmPct: zoneIncidents.length > 0 ? Math.round((bmCount / zoneIncidents.length) * 100) : 0,
+      pmPct: zoneIncidents.length > 0 ? Math.round((pmCount / zoneIncidents.length) * 100) : 0
     };
   }, [activeZoneName, incidents]);
 
@@ -759,7 +763,7 @@ export const IndiaZoneMap: React.FC<IndiaZoneMapProps> = ({
               })}
 
               {/* ==================================================== */}
-              {/* MAJOR SERVICE HUBS & COMPRESSOR/DISPENSER TERMINALS */}
+              {/* MAJOR SERVICE HUBS & REGIONAL TERMINALS */}
               {/* ==================================================== */}
               {showHubs && CITY_HUBS.map(hub => {
                 const isSelectedHubZone = selectedZone?.zone === hub.zone;
@@ -821,9 +825,7 @@ export const IndiaZoneMap: React.FC<IndiaZoneMapProps> = ({
                       cy="0"
                       r={isHubHovered ? (isZoomedToZone ? 4.5 : 3.5) : (isZoomedToZone ? 3.5 : 2.5)}
                       fill={
-                        hub.equipmentFocus === 'Compressor' 
-                          ? '#2563eb' 
-                          : hub.equipmentFocus === 'Dispenser' 
+                        hub.equipmentFocus === 'Dispenser' 
                           ? '#0d9488' 
                           : '#4f46e5'
                       }
@@ -978,7 +980,7 @@ export const IndiaZoneMap: React.FC<IndiaZoneMapProps> = ({
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-slate-800 flex items-center gap-1.5">
                       <Wrench className="w-3.5 h-3.5 text-indigo-600" />
-                      Station Equipment Distribution
+                      Service Call Distribution
                     </span>
                     <span className="text-slate-400 text-[11px]">
                       {activeZoneEquip.total} zone records
@@ -988,25 +990,25 @@ export const IndiaZoneMap: React.FC<IndiaZoneMapProps> = ({
                   {/* Dual color progress bar */}
                   <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex">
                     <div 
-                      style={{ width: `${activeZoneEquip.compPct}%` }}
-                      className="bg-blue-600 h-full transition-all duration-500"
-                      title={`Compressor: ${activeZoneEquip.compCount} (${activeZoneEquip.compPct}%)`}
+                      style={{ width: `${activeZoneEquip.bmPct}%` }}
+                      className="bg-amber-500 h-full transition-all duration-500"
+                      title={`Breakdown (BM): ${activeZoneEquip.bmCount} (${activeZoneEquip.bmPct}%)`}
                     />
                     <div 
-                      style={{ width: `${activeZoneEquip.dispPct}%` }}
+                      style={{ width: `${activeZoneEquip.pmPct}%` }}
                       className="bg-teal-500 h-full transition-all duration-500"
-                      title={`Dispenser: ${activeZoneEquip.dispCount} (${activeZoneEquip.dispPct}%)`}
+                      title={`Preventive (PM): ${activeZoneEquip.pmCount} (${activeZoneEquip.pmPct}%)`}
                     />
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] text-slate-600 pt-0.5">
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-blue-600" />
-                      <span>Compressors: <strong>{activeZoneEquip.compCount}</strong> ({activeZoneEquip.compPct}%)</span>
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span>Breakdown (BM): <strong>{activeZoneEquip.bmCount}</strong> ({activeZoneEquip.bmPct}%)</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-teal-500" />
-                      <span>Dispensers: <strong>{activeZoneEquip.dispCount}</strong> ({activeZoneEquip.dispPct}%)</span>
+                      <span>Preventive (PM): <strong>{activeZoneEquip.pmCount}</strong> ({activeZoneEquip.pmPct}%)</span>
                     </div>
                   </div>
                 </div>

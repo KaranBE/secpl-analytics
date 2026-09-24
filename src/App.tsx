@@ -104,45 +104,37 @@ export default function App() {
     setSyncError(null);
     setIsPermissionDenied(false);
     try {
-      const [compRes, dispRes] = await Promise.allSettled([
-        fetchLiveCompressorRecords(COMPRESSOR_SPREADSHEET_ID, token),
-        fetchLiveDispenserRecords(DISPENSER_SPREADSHEET_ID, token)
-      ]);
-
-      let compLoaded = false;
       let dispLoaded = false;
       let hasPermissionIssue = false;
       const errors: string[] = [];
 
-      if (compRes.status === 'fulfilled') {
-        if (compRes.value.records.length > 0) {
-          setCompressorData(compRes.value.records);
-          compLoaded = true;
-        }
-        setCompressorSheetTitle(compRes.value.sheetTitle);
-      } else {
-        const msg = compRes.reason?.message || 'Access error';
-        if (msg.includes('Permission required') || msg.includes('403') || compRes.reason?.isPermissionDenied) {
-          hasPermissionIssue = true;
-        }
-        errors.push(`Compressor Sheet: ${msg}`);
-      }
-
-      if (dispRes.status === 'fulfilled') {
-        if (dispRes.value.records.length > 0) {
-          setDispenserData(dispRes.value.records);
+      try {
+        const dispRes = await fetchLiveDispenserRecords(DISPENSER_SPREADSHEET_ID, token);
+        if (dispRes.records.length > 0) {
+          setDispenserData(dispRes.records);
           dispLoaded = true;
         }
-        setDispenserSheetTitle(dispRes.value.sheetTitle);
-      } else {
-        const msg = dispRes.reason?.message || 'Access error';
-        if (msg.includes('Permission required') || msg.includes('403') || dispRes.reason?.isPermissionDenied) {
+        setDispenserSheetTitle(dispRes.sheetTitle);
+      } catch (err: any) {
+        const msg = err?.message || 'Access error';
+        if (msg.includes('Permission required') || msg.includes('403') || err?.isPermissionDenied) {
           hasPermissionIssue = true;
         }
         errors.push(`Dispenser Sheet: ${msg}`);
       }
 
-      if (errors.length > 0 && !compLoaded && !dispLoaded) {
+      // Optional background fetch
+      try {
+        const compRes = await fetchLiveCompressorRecords(COMPRESSOR_SPREADSHEET_ID, token);
+        if (compRes.records.length > 0) {
+          setCompressorData(compRes.records);
+        }
+        setCompressorSheetTitle(compRes.sheetTitle);
+      } catch {
+        // Silently skip if unavailable
+      }
+
+      if (errors.length > 0 && !dispLoaded) {
         if (hasPermissionIssue) {
           setIsPermissionDenied(true);
           setSyncError(`Signed-in account requires Viewer permissions from sheet owner (${DEFAULT_SHEET_OWNER_EMAIL}). You can request access, view sharing guide, or continue in Preview Mode.`);
@@ -420,12 +412,12 @@ export default function App() {
     });
   }, [allUnifiedIncidents, filters, searchQuery, availableZones, availableEngineers, availableProblems]);
 
-  // Filtered Compressor records (used specifically for Customer Analysis)
+  // Filtered records for customer metrics
   const filteredCompressorRecords = useMemo(() => {
     const isAllZones = filters.zones.length === 0 || (availableZones.length > 0 && filters.zones.length >= availableZones.length);
     const isAllEngineers = filters.engineers.length === 0 || (availableEngineers.length > 0 && filters.engineers.length >= availableEngineers.length);
 
-    // If dispenser-specific filters are active, compressor data does not match
+    // If dispenser-specific filters are active, return empty
     if (filters.dispenserServiceType && filters.dispenserServiceType !== 'All') return [];
     if (filters.dispenserStation && filters.dispenserStation !== 'All') return [];
     if (filters.dispenserSerialNo && filters.dispenserSerialNo !== 'All') return [];
@@ -460,7 +452,6 @@ export default function App() {
 
     return dispenserData.filter(d => {
       if (!matchesDate(d.date)) return false;
-      if (filters.equipmentType === 'Compressor') return false;
       if (!isAllZones && !filters.zones.includes(d.zoneName)) return false;
       if (!isAllEngineers && !filters.engineers.includes(cleanEngineerName(d.serviceEngineerName))) return false;
       if (filters.status !== 'All' && d.status !== filters.status) return false;
@@ -514,7 +505,6 @@ export default function App() {
 
   // Computed Dynamic Metrics based on filtered data
   const customerMetrics = useMemo(() => {
-    // "customer analysis (only compressor)"
     return computeCustomerMetrics(filteredCompressorRecords);
   }, [filteredCompressorRecords]);
 

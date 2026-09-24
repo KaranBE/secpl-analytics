@@ -13,7 +13,7 @@ export interface CityHubGeo {
   zone: string;
   x: number;
   y: number;
-  equipmentFocus: 'Both' | 'Compressor' | 'Dispenser';
+  equipmentFocus: 'Both' | 'Dispenser' | 'Hub';
   stationCount: number;
 }
 
@@ -435,7 +435,7 @@ export const CITY_HUBS: CityHubGeo[] = [
     "zone": "North Zone",
     "x": 152,
     "y": 215,
-    "equipmentFocus": "Compressor",
+    "equipmentFocus": "Dispenser",
     "stationCount": 22
   },
   {
@@ -475,7 +475,7 @@ export const CITY_HUBS: CityHubGeo[] = [
     "zone": "Central Zone",
     "x": 175,
     "y": 295,
-    "equipmentFocus": "Compressor",
+    "equipmentFocus": "Dispenser",
     "stationCount": 20
   },
   {
@@ -491,7 +491,7 @@ export const CITY_HUBS: CityHubGeo[] = [
     "zone": "Central Zone",
     "x": 292,
     "y": 340,
-    "equipmentFocus": "Compressor",
+    "equipmentFocus": "Dispenser",
     "stationCount": 14
   },
   {
@@ -523,7 +523,7 @@ export const CITY_HUBS: CityHubGeo[] = [
     "zone": "East Zone",
     "x": 465,
     "y": 242,
-    "equipmentFocus": "Compressor",
+    "equipmentFocus": "Dispenser",
     "stationCount": 11
   },
   {

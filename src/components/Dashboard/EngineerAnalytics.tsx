@@ -41,7 +41,7 @@ interface EngineerAnalyticsProps {
   viewMode: ViewMode;
 }
 
-type EngineerFilterTab = 'all' | 'open_tickets' | 'high_sla' | 'compressor_specialist' | 'dispenser_specialist';
+type EngineerFilterTab = 'all' | 'open_tickets' | 'high_sla' | 'fast_response';
 type SortKey = 'workload' | 'closed' | 'sla' | 'response' | 'rating';
 
 export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
@@ -111,11 +111,8 @@ export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
         if (activeFilterTab === 'high_sla') {
           return eng.slaAdherenceRate >= 95;
         }
-        if (activeFilterTab === 'compressor_specialist') {
-          return eng.compressorCalls > eng.dispenserCalls;
-        }
-        if (activeFilterTab === 'dispenser_specialist') {
-          return eng.dispenserCalls >= eng.compressorCalls;
+        if (activeFilterTab === 'fast_response') {
+          return eng.avgResponseMinutes > 0 && eng.avgResponseMinutes <= 45;
         }
 
         return true;
@@ -141,7 +138,6 @@ export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
         fullName: eng.name,
         Closed: eng.totalClosed,
         Open: eng.openTickets,
-        Compressor: eng.compressorCalls,
         Dispenser: eng.dispenserCalls,
         MTTR: eng.avgResolutionHours,
         ResponseMins: eng.avgResponseMinutes,
@@ -293,24 +289,14 @@ export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
             Top SLA (≥ 95%)
           </button>
           <button
-            onClick={() => setActiveFilterTab('compressor_specialist')}
+            onClick={() => setActiveFilterTab('fast_response')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-              activeFilterTab === 'compressor_specialist'
-                ? 'bg-indigo-600 text-white'
+              activeFilterTab === 'fast_response'
+                ? 'bg-sky-600 text-white'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            Compressor Heavy
-          </button>
-          <button
-            onClick={() => setActiveFilterTab('dispenser_specialist')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-              activeFilterTab === 'dispenser_specialist'
-                ? 'bg-teal-600 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Dispenser Heavy
+            Fast Response (≤ 45m)
           </button>
         </div>
 
@@ -376,16 +362,16 @@ export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
             </div>
           </div>
 
-          {/* Chart 2: Equipment Split: Compressor vs Dispenser Calls */}
+          {/* Chart 2: Service Response & Resolution Speed */}
           <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <Activity className="w-4 h-4 text-emerald-600" />
-                  Equipment Allocation Breakdown
+                  Service Response & Resolution Speed
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Compressor vs Dispenser calls completed by each technician
+                  Technician average response time (mins) and resolution MTTR (hours)
                 </p>
               </div>
             </div>
@@ -400,8 +386,8 @@ export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
                     contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
                   />
                   <Legend verticalAlign="top" height={36} iconType="circle" />
-                  <Bar dataKey="Compressor" name="Compressor Calls" fill="#3b82f6" stackId="a" radius={[0, 0, 4, 4]} />
-                  <Bar dataKey="Dispenser" name="Dispenser Calls" fill="#10b981" stackId="a" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="ResponseMins" name="Avg Response (mins)" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="MTTR" name="Avg MTTR (hours)" fill="#10b981" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -448,8 +434,7 @@ export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
                     <th className="py-3 px-3 text-center">Assigned</th>
                     <th className="py-3 px-3 text-center">Resolved</th>
                     <th className="py-3 px-3 text-center">Open</th>
-                    <th className="py-3 px-3 text-center">Compressors</th>
-                    <th className="py-3 px-3 text-center">Dispensers</th>
+                    <th className="py-3 px-3 text-center">Dispenser Calls</th>
                     <th className="py-3 px-3 text-center">Avg Response</th>
                     <th className="py-3 px-3 text-center">Avg MTTR</th>
                     <th className="py-3 px-3 text-center">SLA Compliance</th>
@@ -499,9 +484,6 @@ export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
                           ) : (
                             <span className="text-slate-400 font-medium">0</span>
                           )}
-                        </td>
-                        <td className="py-3 px-3 text-center font-medium text-blue-700">
-                          {eng.compressorCalls}
                         </td>
                         <td className="py-3 px-3 text-center font-medium text-teal-700">
                           {eng.dispenserCalls}
@@ -626,7 +608,7 @@ export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
                     Assigned Incident Dispatch Log ({selectedEngineerIncidents.length})
                   </h4>
                   <p className="text-[11px] text-slate-500">
-                    Direct stream of compressor and dispenser calls routed to this engineer
+                    Direct stream of service and maintenance calls routed to this engineer
                   </p>
                 </div>
                 <div className="relative">
@@ -664,12 +646,8 @@ export const EngineerAnalytics: React.FC<EngineerAnalyticsProps> = ({
                             {inc.date}
                           </td>
                           <td className="py-2.5 px-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              inc.equipmentType === 'Compressor'
-                                ? 'bg-indigo-50 text-indigo-700'
-                                : 'bg-teal-50 text-teal-700'
-                            }`}>
-                              {inc.equipmentType}
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-teal-700">
+                              {inc.contractOrServiceType || 'Dispenser'}
                             </span>
                           </td>
                           <td className="py-2.5 px-3 font-semibold text-slate-900">

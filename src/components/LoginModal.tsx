@@ -104,7 +104,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             Sign in to Service Operations
           </h2>
           <p className="text-xs text-slate-500 mt-1.5 max-w-xs leading-relaxed">
-            Synchronize live incident telemetry from Compressor and Dispenser Google Sheets.
+            Synchronize live incident telemetry from Dispenser Google Sheets.
           </p>
         </div>
 
